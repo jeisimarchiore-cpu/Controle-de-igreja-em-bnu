@@ -168,7 +168,7 @@
         import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // Variáveis globais da aplicação
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mapa-igrejas-blumenau-dev';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'novo-mapa-dev';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "DEV_KEY" };
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -286,7 +286,6 @@
             document.getElementById('confirm-delete-btn').onclick = async () => {
                 try {
                     await deleteDoc(doc(db, igrejasCollectionPath, id));
-                    // A atualização via onSnapshot cuidará de redesenhar
                 } catch (error) { console.error("Erro ao excluir: ", error); } 
                 finally { modal.style.display = 'none'; }
             };
@@ -466,4 +465,3 @@
     </script>
 </body>
 </html>
-
