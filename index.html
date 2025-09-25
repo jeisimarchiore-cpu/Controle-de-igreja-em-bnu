@@ -54,7 +54,9 @@
         #message-area, #import-message-area, #cep-message-area { margin-top: 5px; font-size: 0.9em; color: #28a745; height: 1.2em; }
         #message-area.error, #import-message-area.error, #cep-message-area.error { color: #dc3545; }
         hr { border: none; border-top: 1px solid #eee; margin: 15px 0; }
-        #church-counter { position: absolute; bottom: 20px; left: 20px; z-index: 999; background: rgba(255, 255, 255, 0.9); padding: 8px 15px; border-radius: 8px; font-size: 1.1em; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer; line-height: 1.4; }
+        #bottom-left-controls { position: absolute; bottom: 20px; left: 20px; z-index: 999; display: flex; gap: 10px; }
+        #church-counter, #scan-button { background: rgba(255, 255, 255, 0.9); padding: 8px 15px; border-radius: 8px; font-size: 1.1em; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer; line-height: 1.4; }
+        #scan-button { background-color: #007bff; color: white; border: none; }
         .modal-overlay { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 8px; position: relative; text-align: center; }
         .modal-close-btn { color: #aaa; position: absolute; top: 10px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; }
@@ -72,7 +74,10 @@
 <body>
 
     <div id="map"></div>
-    <div id="church-counter">Carregando igrejas...</div>
+    <div id="bottom-left-controls">
+        <div id="church-counter">Carregando igrejas...</div>
+        <button id="scan-button" title="Escanear área por novas igrejas"><i class="fa fa-search"></i> Escanear Área</button>
+    </div>
 
     <!-- Modais (HTML sem alterações) -->
     <div id="church-list-modal" class="modal-overlay"><div class="modal-content"><span class="modal-close-btn">&times;</span><h2>Lista de Igrejas por Bairro</h2><div id="church-list-content"></div></div></div>
@@ -84,7 +89,7 @@
         <div class="form-group"><label for="gmaps-url">Importar do Google Maps</label><div class="input-group"><input type="url" id="gmaps-url" placeholder="Cole o link do Google Maps aqui"><button type="button" id="import-gmaps-btn" title="Importar dados do link"><i class="fa fa-download"></i></button></div><div id="import-message-area"></div></div>
         <hr>
         <p id="coords-info" style="font-size: 0.9em; color: #555; margin-bottom: 15px;">Clique no mapa ou use o endereço/CEP para localizar.</p>
-        <form id="church-form"><div class="form-group"><label for="church-name">Nome da Igreja</label><input type="text" id="church-name" required></div><div class="form-group"><label for="church-pastor">Líder / Pastor / Padre</label><input type="text" id="church-pastor"></div><div class="form-group"><label for="church-cep">CEP</label><input type="text" id="church-cep" placeholder="Digite os 8 dígitos do CEP"><div id="cep-message-area"></div></div><div class="form-group"><label for="church-numero">Número</label><input type="text" id="church-numero"></div><div class="form-group"><label for="church-bairro">Bairro</label><input type="text" id="church-bairro"></div><div class="form-group"><label for="church-endereco">Endereço Completo</label><div class="input-group"><input type="text" id="church-endereco"><button type="button" id="lookup-address-btn" title="Localizar endereço no mapa"><i class="fa fa-map-marker-alt"></i></button></div></div><div class="form-group"><label>Horários e Atividades</label><div id="horarios-container"></div></div><div class="form-group"><label for="church-contato">Telefone Fixo</label><input type="text" id="church-contato"></div><div class="form-group"><label for="church-whatsapp">WhatsApp</label><input type="text" id="church-whatsapp" placeholder="(47) 9....-...."></div><div class="form-group"><label for="church-redes">Rede Social (URL)</label><input type="url" id="church-redes"></div><div class="form-group" style="display: none;"><label>Coordenadas</label><input type="text" id="church-coords-lat" placeholder="Latitude" readonly><input type="text" id="church-coords-lng" placeholder="Longitude" readonly></div><button type="button" id="save-church-btn">Adicionar Igreja</button><button type="button" id="cancel-edit-btn" style="display: none;">Cancelar Edição</button><div id="message-area"></div></form>
+        <form id="church-form"><div class="form-group"><label for="church-name">Nome da Igreja</label><input type="text" id="church-name" required></div><div class="form-group"><label for="church-pastor">Líder / Pastor / Padre</label><input type="text" id="church-pastor"></div><div class="form-group"><label for="church-cep">CEP</label><input type="text" id="church-cep" placeholder="Digite os 8 dígitos do CEP"><div id="cep-message-area"></div></div><div class="form-group"><label for="church-numero">Número</label><input type="text" id="church-numero"></div><div class="form-group"><label for="church-bairro">Bairro</label><input type="text" id="church-bairro"></div><div class="form-group"><label for="church-endereco">Endereço Completo</label><input type="text" id="church-endereco"></div><div class="form-group"><label>Horários e Atividades</label><div id="horarios-container"></div></div><div class="form-group"><label for="church-contato">Telefone Fixo</label><input type="text" id="church-contato"></div><div class="form-group"><label for="church-whatsapp">WhatsApp</label><input type="text" id="church-whatsapp" placeholder="(47) 9....-...."></div><div class="form-group"><label for="church-redes">Rede Social (URL)</label><input type="url" id="church-redes"></div><div class="form-group" style="display: none;"><label>Coordenadas</label><input type="text" id="church-coords-lat" placeholder="Latitude" readonly><input type="text" id="church-coords-lng" placeholder="Longitude" readonly></div><button type="button" id="save-church-btn">Adicionar Igreja</button><button type="button" id="cancel-edit-btn" style="display: none;">Cancelar Edição</button><div id="message-area"></div></form>
     </div>
 
 
@@ -92,11 +97,8 @@
         // Importar funções do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // ===================================================================================
-        // PASSO IMPORTANTE: COLE A CONFIGURAÇÃO DO SEU NOVO PROJETO FIREBASE AQUI
-        // ===================================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
             authDomain: "controle-de-igrejas.firebaseapp.com",
@@ -106,17 +108,12 @@
             appId: "1:457376397325:web:aacc6cef3e91390314fd44",
             measurementId: "G-PENC7PPT4M"
         };
-        // ===================================================================================
 
-        // Inicialização do Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        
-        // Usando um caminho simples para o banco de dados.
         const igrejasCollection = collection(db, 'igrejas');
 
-        // MAPA E ESTADO DA APLICAÇÃO (sem alterações)
         const centroBlumenau = [-26.9194, -49.0661];
         const zoomInicial = 13;
         const map = L.map('map').setView(centroBlumenau, zoomInicial);
@@ -130,8 +127,8 @@
         let idEmEdicao = null;
         let ruaDoCep = '';
         let markers = [];
+        let geocodeTimer = null;
 
-        // FUNÇÕES PRINCIPAIS (sem alterações)
         function updateChurchCount() { document.getElementById('church-counter').innerHTML = `<i class="fa fa-church"></i> Total de Igrejas: <strong>${igrejas.length}</strong>`; }
         function showMessage(elementId, message, isError = false) { const el = document.getElementById(elementId); el.textContent = message; el.classList.toggle('error', isError); }
 
@@ -300,19 +297,30 @@
                         document.getElementById('church-bairro').value = data.bairro || '';
                         document.getElementById('church-numero').value = '';
                         document.getElementById('church-numero').focus();
-                        showMessage('cep-message-area', 'CEP encontrado!');
+                        showMessage('cep-message-area', 'CEP encontrado! Localizando rua...');
+                        if (ruaDoCep) {
+                            try { const coords = await geocodeAddress(ruaDoCep); setLocationOnMap(coords.lat, coords.lng, 17); showMessage('cep-message-area', 'Rua localizada no mapa!'); } 
+                            catch (error) { showMessage('cep-message-area', 'CEP ok, mas rua não localizada.', true); }
+                        } else { showMessage('cep-message-area', 'CEP sem nome de rua.', true); }
                     }
                 } catch (error) { showMessage('cep-message-area', 'Erro ao buscar o CEP.', true); ruaDoCep = ''; }
             } else { showMessage('cep-message-area', ''); }
         });
 
-        document.getElementById('lookup-address-btn').addEventListener('click', async function() {
-            const endereco = document.getElementById('church-endereco').value;
-            const btn = this;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; btn.disabled = true;
-            try { const coords = await geocodeAddress(endereco); setLocationOnMap(coords.lat, coords.lng); } 
-            catch (error) { showMessage('message-area', error.message, true); } 
-            finally { btn.innerHTML = '<i class="fa fa-map-marker-alt"></i>'; btn.disabled = false; }
+        document.getElementById('church-endereco').addEventListener('input', function() {
+            clearTimeout(geocodeTimer);
+            geocodeTimer = setTimeout(async () => {
+                const endereco = this.value;
+                if (endereco.length < 5) return;
+                showMessage('message-area', 'Localizando...');
+                try {
+                    const coords = await geocodeAddress(endereco);
+                    setLocationOnMap(coords.lat, coords.lng);
+                    showMessage('message-area', 'Endereço localizado!');
+                } catch (error) {
+                    showMessage('message-area', error.message, true);
+                }
+            }, 1000);
         });
         
         document.getElementById('import-gmaps-btn').addEventListener('click', function() { 
@@ -334,7 +342,6 @@
             }
         });
         
-        // --- LÓGICA DO MODAL ---
         const modal = document.getElementById('church-list-modal');
         const closeModalBtn = document.querySelector('.modal-close-btn');
         function showChurchListModal() {
@@ -360,7 +367,6 @@
         const confirmModal = document.getElementById('confirm-modal');
         confirmModal.querySelector('.modal-close-btn').onclick = () => confirmModal.style.display = 'none';
 
-        // --- INICIALIZAÇÃO DO PAINEL DE HORÁRIOS ---
         const timeOptions = (() => { let opts = '<option value="">--:--</option>'; for (let h=0;h<24;h++) for(let m=0;m<60;m+=30) {const t=`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`; opts+=`<option value="${t}">${t}</option>`;} return opts; })();
         const horariosContainer = document.getElementById('horarios-container');
         diasDaSemana.forEach(dia => {
@@ -372,25 +378,73 @@
             const fieldsDiv = dayDiv.querySelector(`#fields-${diaId}`);
             checkbox.addEventListener('change', () => { fieldsDiv.classList.toggle('active', checkbox.checked); if(checkbox.checked) { fieldsDiv.querySelector(`#desc-${diaId}`).focus(); }});
         });
+
+        document.getElementById('scan-button').addEventListener('click', async function() {
+            const bounds = map.getBounds();
+            const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+            const query = `[out:json];(node["amenity"="place_of_worship"](${bbox}););out;`;
+            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+            
+            const btn = this;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Escaneando...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                let novasIgrejas = 0;
+                const batch = writeBatch(db);
+
+                data.elements.forEach(element => {
+                    const nome = element.tags.name || "Igreja sem nome";
+                    const coords = [element.lat, element.lon];
+
+                    const jaExiste = igrejas.some(igreja => 
+                        igreja.nome === nome && 
+                        Math.abs(igreja.coords[0] - coords[0]) < 0.0001 &&
+                        Math.abs(igreja.coords[1] - coords[1]) < 0.0001
+                    );
+
+                    if (!jaExiste) {
+                        const novaIgreja = {
+                            nome: nome,
+                            coords: coords,
+                            bairro: '', pastor: '', endereco: '', horarios: [], contato: '', whatsapp: '', redes_sociais: ''
+                        };
+                        const newDocRef = doc(igrejasCollection);
+                        batch.set(newDocRef, novaIgreja);
+                        novasIgrejas++;
+                    }
+                });
+
+                if (novasIgrejas > 0) {
+                    await batch.commit();
+                    alert(`${novasIgrejas} nova(s) igreja(s) encontrada(s) e adicionada(s)!`);
+                } else {
+                    alert("Nenhuma igreja nova encontrada na área visível do mapa.");
+                }
+
+            } catch (error) {
+                console.error("Erro ao escanear:", error);
+                alert("Ocorreu um erro ao escanear a área. Tente novamente.");
+            } finally {
+                btn.innerHTML = '<i class="fa fa-search"></i> Escanear Área';
+                btn.disabled = false;
+            }
+        });
         
-        // --- LÓGICA DO FIREBASE ---
         async function main() {
             try {
                 await signInAnonymously(auth);
                 onSnapshot(igrejasCollection, (snapshot) => {
                     igrejas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     redesenharTodosOsMarcadores();
-                }, (error) => {
-                    console.error("Erro ao buscar dados: ", error);
-                    document.getElementById('church-counter').innerHTML = `<strong style="color: red;">ERRO:</strong> Verifique as regras do Firestore.`;
-                });
+                }, (error) => { console.error("Erro ao buscar dados: ", error); document.getElementById('church-counter').innerHTML = `<strong style="color: red;">ERRO:</strong> Verifique as regras do Firestore.`; });
             } catch (error) {
                 console.error("Erro na autenticação: ", error);
-                if (error.code === 'auth/configuration-not-found') {
-                    document.getElementById('church-counter').innerHTML = `<strong style="color: red;">AÇÃO NECESSÁRIA:</strong> Ative a Autenticação Anônima no seu projeto Firebase.`;
-                } else {
-                     document.getElementById('church-counter').textContent = 'Erro de conexão. Verifique a chave de API.';
-                }
+                if (error.code === 'auth/configuration-not-found') { document.getElementById('church-counter').innerHTML = `<strong style="color: red;">AÇÃO NECESSÁRIA:</strong> Ative a Autenticação Anônima no seu projeto Firebase.`; } 
+                else { document.getElementById('church-counter').textContent = 'Erro de conexão. Verifique a chave de API.'; }
             }
         }
         
