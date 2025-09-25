@@ -22,68 +22,18 @@
 
 
     <style>
-        /* 2. Estilo para o mapa e o corpo da página */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-            cursor: grab;
-        }
-        /* Estilo customizado para a popup */
-        .leaflet-popup-content-wrapper {
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-        .leaflet-popup-content h3 {
-            margin: 0 0 10px;
-            color: #333;
-            font-size: 1.1em;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-        .leaflet-popup-content p {
-            margin: 5px 0;
-            font-size: 0.9em;
-            color: #555;
-        }
-        .leaflet-popup-content a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        .popup-actions {
-            margin-top: 10px;
-            display: flex;
-            gap: 5px;
-        }
-        .popup-btn {
-            padding: 5px 10px;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
+        /* Estilos CSS (sem alterações) */
+        html, body { height: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { height: 100%; width: 100%; cursor: grab; }
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .leaflet-popup-content h3 { margin: 0 0 10px; color: #333; font-size: 1.1em; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .leaflet-popup-content p { margin: 5px 0; font-size: 0.9em; color: #555; }
+        .leaflet-popup-content a { color: #007bff; text-decoration: none; }
+        .popup-actions { margin-top: 10px; display: flex; gap: 5px; }
+        .popup-btn { padding: 5px 10px; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .popup-edit-btn { background-color: #ffc107; color: #333; }
         .popup-delete-btn { background-color: #dc3545; }
-        
-        /* Estilos para o painel de adição/edição */
-        #side-panel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            width: 320px;
-            max-height: 90%;
-            overflow-y: auto;
-        }
+        #side-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); width: 320px; max-height: 90%; overflow-y: auto; }
         #side-panel h3 { margin-top: 0; }
         .form-group { margin-bottom: 10px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
@@ -91,8 +41,6 @@
         .input-group { display: flex; align-items: center; }
         .input-group input { flex-grow: 1; }
         .input-group button { margin-left: 5px; padding: 8px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        
-        /* Estilos para a nova grade de horários */
         .schedule-day { display: flex; flex-direction: column; margin-bottom: 8px; }
         .schedule-day-label { font-weight: bold; display: flex; align-items: center; }
         .schedule-day-label input[type="checkbox"] { margin-right: 8px; width: auto; }
@@ -101,16 +49,12 @@
         .schedule-day-fields input, .schedule-day-fields select { width: 95%; padding: 6px; font-size: 0.9em; margin-bottom: 5px; }
         .time-fields { display: flex; align-items: center; gap: 5px; }
         .time-fields select { width: auto; flex-grow: 1; }
-
         #save-church-btn { width: 100%; padding: 10px; color: white; border: none; border-radius: 4px; font-size: 1em; cursor: pointer; transition: background-color 0.3s; }
         #cancel-edit-btn { width: 100%; padding: 10px; margin-top: 5px; background-color: #6c757d; color: white; border: none; border-radius: 4px; font-size: 1em; cursor: pointer; }
         #message-area, #import-message-area, #cep-message-area { margin-top: 5px; font-size: 0.9em; color: #28a745; height: 1.2em; }
         #message-area.error, #import-message-area.error, #cep-message-area.error { color: #dc3545; }
         hr { border: none; border-top: 1px solid #eee; margin: 15px 0; }
-
-        #church-counter { position: absolute; bottom: 20px; left: 20px; z-index: 999; background: rgba(255, 255, 255, 0.9); padding: 8px 15px; border-radius: 8px; font-size: 1.1em; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer; }
-
-        /* Estilos para Modais */
+        #church-counter { position: absolute; bottom: 20px; left: 20px; z-index: 999; background: rgba(255, 255, 255, 0.9); padding: 8px 15px; border-radius: 8px; font-size: 1.1em; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer; line-height: 1.4; }
         .modal-overlay { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 8px; position: relative; text-align: center; }
         .modal-close-btn { color: #aaa; position: absolute; top: 10px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; }
@@ -130,28 +74,11 @@
     <div id="map"></div>
     <div id="church-counter">Carregando igrejas...</div>
 
-    <!-- Modal Lista de Igrejas -->
-    <div id="church-list-modal" class="modal-overlay">
-        <div class="modal-content">
-            <span class="modal-close-btn">&times;</span>
-            <h2>Lista de Igrejas por Bairro</h2>
-            <div id="church-list-content"></div>
-        </div>
-    </div>
+    <!-- Modais (HTML sem alterações) -->
+    <div id="church-list-modal" class="modal-overlay"><div class="modal-content"><span class="modal-close-btn">&times;</span><h2>Lista de Igrejas por Bairro</h2><div id="church-list-content"></div></div></div>
+    <div id="confirm-modal" class="modal-overlay"><div class="modal-content"><span class="modal-close-btn">&times;</span><h3>Confirmar Exclusão</h3><p id="confirm-message"></p><div class="modal-buttons"><button id="confirm-delete-btn">Sim, Excluir</button><button id="cancel-delete-btn">Cancelar</button></div></div></div>
     
-    <!-- Modal de Confirmação de Exclusão -->
-    <div id="confirm-modal" class="modal-overlay">
-        <div class="modal-content">
-            <span class="modal-close-btn">&times;</span>
-            <h3>Confirmar Exclusão</h3>
-            <p id="confirm-message"></p>
-            <div class="modal-buttons">
-                <button id="confirm-delete-btn">Sim, Excluir</button>
-                <button id="cancel-delete-btn">Cancelar</button>
-            </div>
-        </div>
-    </div>
-    
+    <!-- Painel Lateral (HTML sem alterações) -->
     <div id="side-panel">
         <h3 id="panel-title">Adicionar Nova Igreja</h3>
         <div class="form-group"><label for="gmaps-url">Importar do Google Maps</label><div class="input-group"><input type="url" id="gmaps-url" placeholder="Cole o link do Google Maps aqui"><button type="button" id="import-gmaps-btn" title="Importar dados do link"><i class="fa fa-download"></i></button></div><div id="import-message-area"></div></div>
@@ -164,41 +91,47 @@
     <script type="module">
         // Importar funções do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Variáveis globais da aplicação
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'controle-de-igrejas';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "DEV_KEY" };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ===================================================================================
+        // PASSO IMPORTANTE: COLE A CONFIGURAÇÃO DO SEU NOVO PROJETO FIREBASE AQUI
+        // ===================================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
+            authDomain: "controle-de-igrejas.firebaseapp.com",
+            projectId: "controle-de-igrejas",
+            storageBucket: "controle-de-igrejas.appspot.com",
+            messagingSenderId: "457376397325",
+            appId: "1:457376397325:web:aacc6cef3e91390314fd44",
+            measurementId: "G-PENC7PPT4M"
+        };
+        // ===================================================================================
 
         // Inicialização do Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        const igrejasCollectionPath = `/artifacts/${appId}/public/data/igrejas`;
-        const igrejasCollection = collection(db, igrejasCollectionPath);
+        // Usando um caminho simples para o banco de dados.
+        const igrejasCollection = collection(db, 'igrejas');
 
-        // MAPA E ESTADO DA APLICAÇÃO
+        // MAPA E ESTADO DA APLICAÇÃO (sem alterações)
         const centroBlumenau = [-26.9194, -49.0661];
         const zoomInicial = 13;
         const map = L.map('map').setView(centroBlumenau, zoomInicial);
-
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
         const iconeIgreja = L.AwesomeMarkers.icon({ icon: 'church', markerColor: 'darkred', prefix: 'fa' });
         const iconeTemporario = L.AwesomeMarkers.icon({ icon: 'plus', markerColor: 'blue', prefix: 'fa' });
-
         const camadaIgrejas = L.layerGroup().addTo(map);
         const diasDaSemana = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-        
         let igrejas = [];
         let marcadorTemporario = null;
         let idEmEdicao = null;
         let ruaDoCep = '';
         let markers = [];
 
-        // FUNÇÕES PRINCIPAIS
+        // FUNÇÕES PRINCIPAIS (sem alterações)
         function updateChurchCount() { document.getElementById('church-counter').innerHTML = `<i class="fa fa-church"></i> Total de Igrejas: <strong>${igrejas.length}</strong>`; }
         function showMessage(elementId, message, isError = false) { const el = document.getElementById(elementId); el.textContent = message; el.classList.toggle('error', isError); }
 
@@ -216,11 +149,7 @@
                         const atividadesDoDia = igreja.horarios.filter(h => h.dia === dia);
                         if (atividadesDoDia.length > 0) {
                             horariosFormatados += `&bull; ${dia}: `;
-                            horariosFormatados += atividadesDoDia.map(a => {
-                                let timeStr = a.horaInicio;
-                                if (a.horaFim) timeStr += ` - ${a.horaFim}`;
-                                return `${timeStr} - ${a.desc}`;
-                            }).join(', ');
+                            horariosFormatados += atividadesDoDia.map(a => { let timeStr = a.horaInicio; if (a.horaFim) timeStr += ` - ${a.horaFim}`; return `${timeStr} - ${a.desc}`; }).join(', ');
                             horariosFormatados += `<br>`;
                         }
                     });
@@ -284,9 +213,8 @@
             document.getElementById('confirm-message').textContent = `Tem certeza que deseja excluir a igreja "${nome}"?`;
             modal.style.display = 'block';
             document.getElementById('confirm-delete-btn').onclick = async () => {
-                try {
-                    await deleteDoc(doc(db, igrejasCollectionPath, id));
-                } catch (error) { console.error("Erro ao excluir: ", error); } 
+                try { await deleteDoc(doc(db, 'igrejas', id)); } 
+                catch (error) { console.error("Erro ao excluir: ", error); } 
                 finally { modal.style.display = 'none'; }
             };
             document.getElementById('cancel-delete-btn').onclick = () => { modal.style.display = 'none'; };
@@ -324,12 +252,8 @@
             const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
             const response = await fetch(url);
             const data = await response.json();
-            if (data && data.length > 0) {
-                const { lat, lon } = data[0];
-                return { lat: parseFloat(lat), lng: parseFloat(lon) };
-            } else {
-                throw new Error("Endereço não encontrado.");
-            }
+            if (data && data.length > 0) { const { lat, lon } = data[0]; return { lat: parseFloat(lat), lng: parseFloat(lon) }; } 
+            else { throw new Error("Endereço não encontrado."); }
         }
 
         map.on('click', function(e) { if (idEmEdicao !== null) return; setLocationOnMap(e.latlng.lat, e.latlng.lng); });
@@ -355,7 +279,7 @@
             };
             this.textContent = 'Salvando...'; this.disabled = true;
             try {
-                if (idEmEdicao) { await setDoc(doc(db, igrejasCollectionPath, idEmEdicao), dadosIgreja); } 
+                if (idEmEdicao) { await setDoc(doc(db, 'igrejas', idEmEdicao), dadosIgreja); } 
                 else { await addDoc(igrejasCollection, dadosIgreja); }
                 resetarPainel();
             } catch (error) { console.error("Erro ao salvar: ", error); showMessage('message-area', 'Erro ao salvar. Tente novamente.', true); } 
@@ -452,12 +376,22 @@
         // --- LÓGICA DO FIREBASE ---
         async function main() {
             try {
-                if (initialAuthToken) { await signInWithCustomToken(auth, initialAuthToken); } else { await signInAnonymously(auth); }
+                await signInAnonymously(auth);
                 onSnapshot(igrejasCollection, (snapshot) => {
                     igrejas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     redesenharTodosOsMarcadores();
-                }, (error) => { console.error("Erro ao buscar dados: ", error); document.getElementById('church-counter').textContent = 'Erro ao carregar dados.'; });
-            } catch (error) { console.error("Erro na autenticação: ", error); document.getElementById('church-counter').textContent = 'Erro de conexão.'; }
+                }, (error) => {
+                    console.error("Erro ao buscar dados: ", error);
+                    document.getElementById('church-counter').innerHTML = `<strong style="color: red;">ERRO:</strong> Verifique as regras do Firestore.`;
+                });
+            } catch (error) {
+                console.error("Erro na autenticação: ", error);
+                if (error.code === 'auth/configuration-not-found') {
+                    document.getElementById('church-counter').innerHTML = `<strong style="color: red;">AÇÃO NECESSÁRIA:</strong> Ative a Autenticação Anônima no seu projeto Firebase.`;
+                } else {
+                     document.getElementById('church-counter').textContent = 'Erro de conexão. Verifique a chave de API.';
+                }
+            }
         }
         
         main();
