@@ -137,16 +137,16 @@
         document.addEventListener('DOMContentLoaded', () => {
 
             // =================================================================================
-            // CONFIGURAÇÃO DO FIREBASE
+            // CONFIGURAÇÃO DO FIREBASE (FORMATO LIMPO E VERIFICADO)
             // =================================================================================
             const USER_FIREBASE_CONFIG = {
-                apiKey:"AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
-                authDomain:"controle-de-igrejas.firebaseapp.com",
-                projectId:"controle-de-igrejas",
-                storageBucket:"controle-de-igrejas.firebasestorage.app",
-                messagingSenderId:"457376397325",
-                appId:"1:457376397325:web:aacc6cef3e91390314fd44",
-                measurementId:"G-PENC7PPT4M"
+                apiKey: "AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
+                authDomain: "controle-de-igrejas.firebaseapp.com",
+                projectId: "controle-de-igrejas",
+                storageBucket: "controle-de-igrejas.firebasestorage.app",
+                messagingSenderId: "457376397325",
+                appId: "1:457376397325:web:aacc6cef3e91390314fd44",
+                measurementId: "G-PENC7PPT4M"
             };
             // =================================================================================
 
@@ -172,56 +172,7 @@
             };
             
             let map, db, igrejasCollectionRef;
-
-            // --- INICIALIZAÇÃO ---
-            function initializeApp() {
-                UI.showLoading('A inicializar...');
-                if (!USER_FIREBASE_CONFIG || !USER_FIREBASE_CONFIG.apiKey || USER_FIREBASE_CONFIG.apiKey.includes("COLE_SUA")) {
-                    UI.showError("Configuração Incompleta", "Por favor, cole as credenciais do seu projeto Firebase no ficheiro HTML para continuar.");
-                    return;
-                }
-
-                try {
-                    const firebaseApp = initializeApp(USER_FIREBASE_CONFIG);
-                    db = getFirestore(firebaseApp);
-                    const auth = getAuth(firebaseApp);
-                    igrejasCollectionRef = collection(db, "igrejas");
-
-                    signInAnonymously(auth).then(() => {
-                        initializeMap();
-                        setupEventListeners();
-                        fetchData();
-                    }).catch(err => {
-                        UI.showError("Erro de Autenticação", "Não foi possível ligar ao serviço de autenticação. Verifique os seus 'Domínios autorizados' no painel do Firebase.");
-                    });
-                } catch (error) {
-                    UI.showError("Erro Crítico na Inicialização", `Ocorreu um erro ao iniciar o Firebase. Verifique as suas credenciais. Detalhe: ${error.message}`);
-                }
-            }
-
-            function initializeMap() {
-                map = L.map('map-container').setView(MAP_CENTER, 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
-            }
-
-            function fetchData() {
-                UI.showLoading('A carregar dados...');
-                onSnapshot(igrejasCollectionRef, (snapshot) => {
-                    state.allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    Logic.applyFilters();
-                    UI.renderFilterButtons();
-                    UI.renderChurchList();
-                    UI.renderMarkers();
-                    UI.hideLoading();
-                }, (error) => {
-                     const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
-                     UI.showError("Erro de Permissão", `A sua base de dados bloqueou o acesso. Certifique-se de que iniciou a base de dados em <b>modo de teste</b>. <a href="${rulesUrl}" target="_blank" class="text-sky-600 underline font-semibold">Clique aqui para verificar as suas Regras de Segurança</a>.`);
-                });
-            }
-
+            
             // --- LÓGICA DE NEGÓCIO ---
             const Logic = {
                 applyFilters(searchText = document.getElementById('search-input').value.toLowerCase()) {
@@ -239,12 +190,10 @@
                 },
                 selectChurch(churchId) {
                     if (state.selectedChurchId === churchId) {
-                        // Se já estiver selecionado, não faz nada para evitar re-renderizações desnecessárias
                         return;
                     }
                     state.selectedChurchId = churchId;
 
-                    // Atualiza a UI da lista
                     document.querySelectorAll('.church-card').forEach(card => {
                         card.classList.toggle('selected', card.dataset.id === churchId);
                         if (card.dataset.id === churchId) {
@@ -252,7 +201,6 @@
                         }
                     });
 
-                    // Atualiza o mapa
                     const marker = state.allMarkers.get(churchId);
                     if (marker) {
                         map.setView(marker.getLatLng(), 16);
@@ -465,7 +413,6 @@
                         form.innerHTML = content;
                         
                         if(state.currentFormStep === 1) { 
-                            // O Leaflet precisa de um pequeno atraso para renderizar corretamente dentro de um modal que acabou de aparecer
                             setTimeout(() => this.initModalMap(), 50); 
                         }
 
@@ -482,7 +429,7 @@
                         const initialCoords = (initialLat && initialLng) ? [initialLat, initialLng] : MAP_CENTER;
                         
                         const mapElement = document.getElementById('modal-map');
-                        if (mapElement._leaflet_id) { // Evita reinicialização
+                        if (mapElement._leaflet_id) { 
                             return;
                         }
 
@@ -542,7 +489,30 @@
                 }
             };
 
-            // --- CONFIGURAÇÃO DOS EVENT LISTENERS ---
+            // --- FUNÇÕES DE SETUP ---
+            function initializeMap() {
+                map = L.map('map-container').setView(MAP_CENTER, 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+            }
+
+            function fetchData() {
+                UI.showLoading('A carregar dados...');
+                onSnapshot(igrejasCollectionRef, (snapshot) => {
+                    state.allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    Logic.applyFilters();
+                    UI.renderFilterButtons();
+                    UI.renderChurchList();
+                    UI.renderMarkers();
+                    UI.hideLoading();
+                }, (error) => {
+                     const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
+                     UI.showError("Erro de Permissão", `A sua base de dados bloqueou o acesso. Certifique-se de que iniciou a base de dados em <b>modo de teste</b>. <a href="${rulesUrl}" target="_blank" class="text-sky-600 underline font-semibold">Clique aqui para verificar as suas Regras de Segurança</a>.`);
+                });
+            }
+
             function setupEventListeners() {
                 document.getElementById('filter-container').addEventListener('click', (e) => {
                     if (e.target.tagName === 'BUTTON') {
@@ -589,8 +559,37 @@
                 document.getElementById('save-church-btn').addEventListener('click', Logic.saveChurch);
             }
 
-            // --- PONTO DE ENTRADA ---
-            initializeApp();
+            // --- PONTO DE ENTRADA DA APLICAÇÃO ---
+            UI.showLoading('A inicializar...');
+            
+            if (!USER_FIREBASE_CONFIG || !USER_FIREBASE_CONFIG.apiKey || USER_FIREBASE_CONFIG.apiKey.includes("COLE_SUA")) {
+                UI.showError("Configuração Incompleta", "Por favor, cole as credenciais do seu projeto Firebase no ficheiro HTML para continuar.");
+                return;
+            }
+            
+            try {
+                console.log("A tentar inicializar o Firebase com a seguinte configuração:", USER_FIREBASE_CONFIG);
+                const firebaseApp = initializeApp(USER_FIREBASE_CONFIG);
+                console.log("Firebase inicializado com sucesso.");
+                
+                db = getFirestore(firebaseApp);
+                const auth = getAuth(firebaseApp);
+                igrejasCollectionRef = collection(db, "igrejas");
+
+                signInAnonymously(auth).then(() => {
+                    console.log("Autenticação anónima bem-sucedida.");
+                    initializeMap();
+                    setupEventListeners();
+                    fetchData();
+                }).catch(err => {
+                    console.error("Erro na autenticação:", err);
+                    UI.showError("Erro de Autenticação", "Não foi possível ligar ao serviço de autenticação. Verifique os seus 'Domínios autorizados' no painel do Firebase.");
+                });
+
+            } catch (error) {
+                console.error("ERRO CRÍTICO NA INICIALIZAÇÃO:", error);
+                UI.showError("Erro Crítico na Inicialização", `Ocorreu um erro ao iniciar o Firebase. Verifique se as credenciais foram coladas corretamente, sem espaços ou caracteres extras. Detalhe: ${error.message}`);
+            }
         });
     </script>
 </body>
