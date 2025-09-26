@@ -90,6 +90,7 @@
     <!-- MODAIS E OUTROS ELEMENTOS FLUTUANTES -->
     <div id="floating-elements-container">
         <div id="modal-container"></div>
+        <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] space-y-2"></div>
     </div>
     
     <!-- OVERLAY DE CARREGAMENTO INICIAL -->
@@ -256,6 +257,8 @@
                     document.getElementById('neighborhood-filter').addEventListener('change', async (e) => {
                         const neighborhood = e.target.value;
                         const city = document.getElementById('city-filter').value;
+                        
+                        UI.updateFilters(); // Atualiza as denominações ao mudar o bairro
 
                         if (neighborhood && city) {
                             UI.showLoading('A localizar bairro...');
@@ -315,17 +318,25 @@
                     const denFilter = document.getElementById('denomination-filter');
                     const neiFilter = document.getElementById('neighborhood-filter');
                     const selectedCity = cityFilter.value;
+                    const selectedNeighborhood = neiFilter.value;
 
                     // Cidades
-                    cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_SC).sort().map(c => `<option value="${c}" ${c === selectedCity ? 'selected' : ''}>${c}</option>`).join('');
-
-                    // Denominações
-                    denFilter.innerHTML = '<option value="">Todas as Denominações</option>' + DENOMINATIONS.map(d => `<option value="${d}">${d}</option>`).join('');
-
-                    // Bairros
+                    if (cityFilter.options.length <= 1) { // Só preenche uma vez para manter a seleção do utilizador
+                         cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_SC).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+                    }
+                    
+                    // Bairros (atualiza sempre que a cidade muda)
                     const neighborhoods = BAIRROS_POR_CIDADE[selectedCity] || [];
                     neiFilter.innerHTML = '<option value="">Todos os Bairros</option>' + neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
+                    neiFilter.value = selectedNeighborhood; // Tenta manter o bairro selecionado se existir na nova lista
                     neiFilter.disabled = !selectedCity;
+
+                    // Denominações (dinâmico)
+                    let relevantChurches = state.allChurches;
+                    if (selectedCity) relevantChurches = relevantChurches.filter(c => c.city === selectedCity);
+                    if (selectedNeighborhood) relevantChurches = relevantChurches.filter(c => c.neighborhood === selectedNeighborhood);
+                    const denominations = [...new Set(relevantChurches.map(c => c.denomination).filter(Boolean))].sort();
+                    denFilter.innerHTML = '<option value="">Todas as Denominações</option>' + denominations.map(d => `<option value="${d}">${d}</option>`).join('');
                 },
                 showToast: (message, isError = false) => {
                     const toastContainer = document.getElementById('toast-container');
