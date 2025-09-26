@@ -338,6 +338,16 @@
                     neiFilter.innerHTML = '<option value="">Todos os Bairros</option>' + neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
                     neiFilter.disabled = !selectedCity;
                 },
+                showToast: (message, isError = false) => {
+                    const toastContainer = document.getElementById('toast-container');
+                    const toast = document.createElement('div');
+                    toast.className = `p-3 rounded-md shadow-md text-white fade-in ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+                    toast.textContent = message;
+                    toastContainer.appendChild(toast);
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 4000);
+                },
                 ProgressBar: {
                     show(label) {
                         const bar = document.getElementById('import-progress-bar');
@@ -529,17 +539,20 @@
                             <div class="p-4 space-y-3">
                                 <button id="import-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Assistente de Importação Inteligente</button>
                                 <button id="cleanup-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Limpar Locais Fora de SC</button>
-                                <button id="test-connection-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Testar Ligação</button>
+                                <button id="clear-all-btn" class="w-full text-left p-3 rounded-md bg-red-50 text-red-700 hover:bg-red-100 transition">Apagar TODA a Base de Dados</button>
+                                <button id="test-connection-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition mt-4">Testar Ligação</button>
                             </div>`;
                         const modal = this._createModal('admin-modal', content, 'max-w-md');
                         modal.classList.remove('hidden');
                         modal.querySelector('#import-btn').addEventListener('click', () => { modal.remove(); this.openImportAssistant(); });
                         modal.querySelector('#cleanup-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'cleanup' }); });
-                        modal.querySelector('#test-connection-btn').addEventListener('click', async () => { UI.showLoading('A testar...'); try { await getDocs(query(state.igrejasCollectionRef, limit(1))); alert('Ligação com Firebase OK!'); } catch(e) { alert(`Falha na ligação: ${e.message}`); } finally { UI.hideLoading(); }});
+                        modal.querySelector('#clear-all-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'clearAll' }); });
+                        modal.querySelector('#test-connection-btn').addEventListener('click', async () => { UI.showLoading('A testar...'); try { await getDocs(query(state.igrejasCollectionRef, limit(1))); UI.showToast('Ligação com Firebase OK!'); } catch(e) { UI.showToast(`Falha na ligação: ${e.message}`, true); } finally { UI.hideLoading(); }});
                     },
                     openConfirm({ action }) {
                         const options = {
-                            cleanup: { title: 'Limpar Locais Fora de SC', message: 'Isto irá apagar igrejas fora de Santa Catarina. Requer senha.' }
+                            cleanup: { title: 'Limpar Locais Fora de SC', message: 'Isto irá apagar igrejas fora de Santa Catarina. Requer senha.' },
+                            clearAll: { title: 'Apagar TUDO', message: 'Isto é irreversível e irá apagar TODAS as igrejas. Requer senha.' }
                         };
                         const content = `
                             <div class="p-6 text-center">
@@ -557,6 +570,7 @@
                             if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
                                 modal.remove();
                                 if (action === 'cleanup') Admin.cleanupOutsideSC();
+                                if (action === 'clearAll') Admin.clearAll();
                             } else {
                                 alert('Senha incorreta!');
                             }
@@ -730,7 +744,7 @@
 
                     if (toDelete.length === 0) {
                         UI.hideLoading();
-                        alert('Nenhum local fora de Santa Catarina encontrado.');
+                        UI.showToast('Nenhum local fora de Santa Catarina encontrado.');
                         return;
                     }
 
@@ -739,7 +753,15 @@
                     toDelete.forEach(id => batch.delete(doc(state.igrejasCollectionRef, id)));
                     await batch.commit();
                     UI.hideLoading();
-                    alert(`${toDelete.length} locais fora de Santa Catarina foram removidos.`);
+                    UI.showToast(`${toDelete.length} locais fora de Santa Catarina foram removidos.`);
+                },
+                async clearAll() {
+                    UI.showLoading(`A apagar ${state.allChurches.length} locais...`);
+                    const batch = writeBatch(state.db);
+                    state.allChurches.forEach(church => batch.delete(doc(state.igrejasCollectionRef, church.id)));
+                    await batch.commit();
+                    UI.hideLoading();
+                    UI.showToast('Todos os locais foram removidos com sucesso.', true);
                 }
             };
             const API = {
