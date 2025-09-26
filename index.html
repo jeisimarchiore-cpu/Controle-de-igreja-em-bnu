@@ -90,6 +90,7 @@
     <!-- MODAIS E OUTROS ELEMENTOS FLUTUANTES -->
     <div id="floating-elements-container">
         <div id="modal-container"></div>
+        <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] space-y-2"></div>
 
         <!-- BARRA DE PROGRESSO PARA IMPORTAÇÃO -->
         <div id="import-progress-bar" class="fixed bottom-4 right-4 z-50 bg-white p-3 rounded-lg shadow-lg w-full max-w-sm hidden transition-opacity duration-300 fade-in">
@@ -357,6 +358,23 @@
                     setTimeout(() => {
                         toast.remove();
                     }, 4000);
+                },
+                ProgressBar: {
+                    show(label) {
+                        const bar = document.getElementById('import-progress-bar');
+                        bar.classList.remove('hidden');
+                        this.update(0, label);
+                    },
+                    hide() {
+                        setTimeout(() => document.getElementById('import-progress-bar').classList.add('hidden'), 3000);
+                    },
+                    update(percentage, label) {
+                        const p = Math.round(percentage);
+                        const bar = document.getElementById('import-progress-bar');
+                        bar.querySelector('#import-progress-fill').style.width = `${p}%`;
+                        bar.querySelector('#import-progress-text').textContent = `${p}%`;
+                        if (label) bar.querySelector('#import-progress-label').textContent = label;
+                    }
                 },
                 Modals: {
                     _createModal(id, content, maxWidth = 'max-w-lg') {
