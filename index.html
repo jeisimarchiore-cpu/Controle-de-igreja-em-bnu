@@ -217,9 +217,10 @@
             <div id="church-list-content" class="p-6 overflow-y-auto custom-scrollbar flex-grow"></div>
              <div class="flex justify-between items-center p-5 border-t bg-gray-50/50 rounded-b-xl">
                 <span class="text-sm text-gray-700 font-medium">Funções Administrativas</span>
-                <div>
+                <div class="flex items-center">
                      <button id="scan-map-btn" class="bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-blue-700 transition" title="Escanear mapa por novas igrejas"><i class="fa fa-search mr-2"></i>Escanear Mapa</button>
                     <button id="clear-map-btn" class="bg-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-red-700 transition ml-2" title="Apagar todos os dados do mapa"><i class="fa fa-trash-alt mr-2"></i>Limpar Mapa</button>
+                    <button id="test-db-connection-btn" class="bg-green-600 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-green-700 transition ml-2" title="Testar a ligação com a base de dados"><i class="fa fa-database mr-2"></i>Testar Ligação</button>
                 </div>
             </div>
         </div>
@@ -253,7 +254,7 @@
         // Importações do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc, writeBatch, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         document.addEventListener('DOMContentLoaded', () => {
             // --- INSERIR CONFIGURAÇÃO DO FIREBASE AQUI ---
@@ -261,7 +262,7 @@
                 apiKey: "AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
                 authDomain: "controle-de-igrejas.firebaseapp.com",
                 projectId: "controle-de-igrejas",
-                storageBucket: "controle-de-igrejas.appspot.com",
+                storageBucket: "controle-de-igrejas.firebasestorage.app",
                 messagingSenderId: "457376397325",
                 appId: "1:457376397325:web:aacc6cef3e91390314fd44",
                 measurementId: "G-PENC7PPT4M"
@@ -340,10 +341,10 @@
                 showError: (title, message) => {
                     DOMElements.loadingOverlay.classList.remove('hidden');
                     DOMElements.loadingOverlay.innerHTML = `
-                        <div class="text-center p-8">
+                        <div class="text-center p-8 max-w-lg mx-auto bg-white rounded-lg shadow-lg">
                             <i class="fa fa-exclamation-triangle text-5xl text-red-500"></i>
                             <p class="mt-4 text-gray-800 font-semibold text-lg">${title}</p>
-                            <p class="mt-2 text-gray-600">${message}</p>
+                            <div class="mt-2 text-gray-600 text-sm">${message}</div>
                         </div>
                     `;
                 },
@@ -366,7 +367,7 @@
                 hideModal: (id) => document.getElementById(id)?.classList.replace('flex', 'hidden'),
                 setupConfirmModal: ({ title, message, actionText, actionClass, onConfirm, requiresPassword = false, showCancelButton = true }) => {
                     document.getElementById('confirm-title').textContent = title;
-                    document.getElementById('confirm-message').textContent = message;
+                    document.getElementById('confirm-message').innerHTML = message; // Use innerHTML to allow links
                     const actionBtn = document.getElementById('confirm-action-btn');
                     actionBtn.textContent = actionText;
                     actionBtn.className = `px-8 py-2.5 rounded-lg text-white font-semibold transition ${actionClass}`;
@@ -688,6 +689,48 @@
             };
 
             const Admin = {
+                testDbConnection: async () => {
+                    UI.showLoading('Testando ligação...');
+                    try {
+                        // Tenta ler um único documento para testar a permissão de leitura.
+                        const testQuery = query(igrejasCollectionRef, limit(1));
+                        await getDocs(testQuery);
+
+                        UI.hideLoading();
+                        UI.setupConfirmModal({
+                            title: 'Ligação Bem-sucedida!',
+                            message: 'A aplicação conseguiu ligar-se e ler os dados da sua base de dados Firebase com sucesso.',
+                            actionText: 'OK',
+                            actionClass: 'bg-green-600 hover:bg-green-700',
+                            onConfirm: () => {},
+                            showCancelButton: false
+                        });
+
+                    } catch (error) {
+                        console.error("Teste de ligação falhou:", error);
+                        UI.hideLoading();
+                        const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
+                        if (error.code === 'permission-denied') {
+                             UI.setupConfirmModal({
+                                title: 'Falha na Ligação (Erro de Permissão)',
+                                message: `O teste falhou. A sua base de dados está a bloquear o acesso. Por favor, siga os passos na mensagem de erro principal para corrigir as 'Regras' no seu painel Firebase. <a href="${rulesUrl}" target="_blank" class="text-blue-600 underline font-bold">Clique aqui para ir para a página de Regras.</a>`,
+                                actionText: 'Entendido',
+                                actionClass: 'bg-red-600 hover:bg-red-700',
+                                onConfirm: () => {},
+                                showCancelButton: false
+                            });
+                        } else {
+                             UI.setupConfirmModal({
+                                title: 'Falha na Ligação',
+                                message: `Não foi possível ligar ao Firebase. Verifique a sua ligação à internet e a configuração do Firebase no ficheiro HTML. Erro: ${error.message}`,
+                                actionText: 'OK',
+                                actionClass: 'bg-red-600 hover:bg-red-700',
+                                onConfirm: () => {},
+                                showCancelButton: false
+                            });
+                        }
+                    }
+                },
                 confirmDelete: (id, name) => {
                     UI.setupConfirmModal({
                         title: 'Confirmar Exclusão',
@@ -1012,6 +1055,8 @@
                 // Funções Admin
                 document.getElementById('clear-map-btn').addEventListener('click', Admin.confirmClearMap);
                 document.getElementById('scan-map-btn').addEventListener('click', Admin.confirmScanMap);
+                document.getElementById('test-db-connection-btn').addEventListener('click', Admin.testDbConnection);
+
                 DOMElements.inspectModeBtn.addEventListener('click', () => {
                     isInspectMode = !isInspectMode;
                     DOMElements.inspectModeBtn.classList.toggle('active', isInspectMode);
@@ -1047,16 +1092,15 @@
                         ? JSON.parse(__firebase_config)
                         : USER_FIREBASE_CONFIG;
                     
-                    if (!firebaseConfig || firebaseConfig.apiKey.startsWith("AIzaSyDXmAZ")) {
+                    if (!firebaseConfig || !firebaseConfig.apiKey) {
                          throw new Error("Configuração do Firebase não encontrada ou não preenchida. Edite o arquivo HTML.");
                     }
-                    
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-map-app';
 
                     app = initializeApp(firebaseConfig);
                     db = getFirestore(app);
                     auth = getAuth(app);
-                    igrejasCollectionRef = collection(db, `artifacts/${appId}/public/data/igrejas`);
+                    // CORREÇÃO: O caminho da coleção deve corresponder às regras de segurança.
+                    igrejasCollectionRef = collection(db, "igrejas");
                     
                     map = L.map('map-container', { zoomControl: false }).setView(MAP_CENTER, INITIAL_ZOOM);
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
@@ -1092,26 +1136,47 @@
                     } else {
                         await signInAnonymously(auth);
                     }
-                    UI.showLoading('Carregando dados das igrejas...');
-                    
-                    onSnapshot(igrejasCollectionRef, (snapshot) => {
-                        allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        if (DOMElements.searchInput.value.trim() === '') {
-                            displayedChurches = [...allChurches];
-                        }
-                        MapLogic.redrawAllMarkers();
-                        UI.hideLoading();
-                    }, (error) => {
-                        console.error("Erro ao buscar dados: ", error);
-                        DOMElements.churchCounter.innerHTML = `<strong class="text-red-500">ERRO AO CARREGAR DADOS</strong>`;
-                        UI.hideLoading();
-                    });
-
                 } catch (error) {
                     console.error("Erro na autenticação:", error);
                     DOMElements.churchCounter.innerHTML = `<strong class="text-red-500">FALHA NA AUTENTICAÇÃO</strong>`;
                     UI.hideLoading();
+                    const authUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/authentication/settings`;
+                    UI.showError(
+                        "Erro de Autenticação",
+                        `Verifique se o seu domínio está autorizado no Firebase. <a href="${authUrl}" target="_blank" class="text-blue-600 underline font-bold">Clique aqui para abrir as configurações de autenticação</a> e adicione o seu domínio.`
+                    );
+                    return;
                 }
+
+                UI.showLoading('A carregar dados das igrejas...');
+                onSnapshot(igrejasCollectionRef, (snapshot) => {
+                    allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    if (DOMElements.searchInput.value.trim() === '') {
+                        displayedChurches = [...allChurches];
+                    }
+                    MapLogic.redrawAllMarkers();
+                    UI.hideLoading();
+                }, (error) => {
+                    console.error("Erro ao buscar dados: ", error);
+                    DOMElements.churchCounter.innerHTML = `<strong class="text-red-500">ERRO AO CARREGAR DADOS</strong>`;
+                    UI.hideLoading();
+                    const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
+                    UI.showError(
+                        "Erro de Permissão no Firebase",
+                        `A sua base de dados bloqueou o acesso. <b>A correção é feita no site do Firebase.</b><br/><br/>
+                         1. <a href="${rulesUrl}" target="_blank" class="text-blue-600 underline font-bold">Clique aqui para abrir a página de Regras do seu projeto.</a><br/>
+                         2. Apague todo o texto que está lá e cole o seguinte:<br/>
+                         <code class="bg-gray-200 p-1 rounded text-xs block text-left my-2" style="white-space: pre-wrap;">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /igrejas/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</code>
+                         3. Clique no botão 'Publicar' e recarregue esta página.`
+                    );
+                });
             }
             
             // Iniciar a aplicação
@@ -1120,3 +1185,4 @@
     </script>
 </body>
 </html>
+
