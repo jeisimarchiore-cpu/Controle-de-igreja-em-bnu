@@ -716,8 +716,89 @@
                         requiresPassword: true
                     });
                 },
-                scanMapForChurches: async () => { /* ... implementation needed ... */ },
-                findAndAddChurchFromMap: async (lat, lng) => { /* ... implementation needed ... */ }
+                scanMapForChurches: async () => {
+                    UI.hideModal('church-list-modal');
+                    UI.hideModal('confirm-modal');
+                    UI.showProgressBar('Iniciando escaneamento...');
+
+                    const bounds = { minLon: -49.25, minLat: -27.05, maxLon: -49.00, maxLat: -26.75 };
+                    const query = 'igreja';
+                    const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=jsonv2&viewbox=${bounds.minLon},${bounds.maxLat},${bounds.maxLon},${bounds.minLat}&bounded=1&limit=100`;
+
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error('Falha na resposta da rede');
+                        const results = await response.json();
+
+                        if (results.length === 0) {
+                            UI.updateProgressBar(100, 'Nenhuma nova igreja encontrada.');
+                            UI.hideProgressBar();
+                            return;
+                        }
+
+                        const newChurches = [];
+                        for (const result of results) {
+                            const lat = parseFloat(result.lat);
+                            const lon = parseFloat(result.lon);
+                            const name = result.display_name.split(',')[0];
+
+                            const isDuplicate = allChurches.some(church => {
+                                const distance = Math.sqrt(Math.pow(church.coords[0] - lat, 2) + Math.pow(church.coords[1] - lon, 2));
+                                return distance < 0.0002;
+                            });
+
+                            if (!isDuplicate) newChurches.push({ lat, lon, nome: name });
+                        }
+
+                        if (newChurches.length === 0) {
+                            UI.updateProgressBar(100, 'Nenhuma igreja nova encontrada.');
+                            UI.hideProgressBar();
+                            return;
+                        }
+                        
+                        let addedCount = 0;
+                        for (let i = 0; i < newChurches.length; i++) {
+                            const newChurch = newChurches[i];
+                            const progress = ((i + 1) / newChurches.length) * 100;
+                            UI.updateProgressBar(progress, `Adicionando: ${newChurch.nome}`);
+                            const addrDetails = await API.fetchAddressForCoords(newChurch.lat, newChurch.lon);
+                            const churchData = {
+                                nome: newChurch.nome, pastor: '', bairro: addrDetails.bairro || '', endereco: addrDetails.endereco || '',
+                                horarios: [], contato: '', whatsapp: '', redes_sociais: '', coords: [newChurch.lat, newChurch.lon]
+                            };
+                            await addDoc(igrejasCollectionRef, churchData);
+                            addedCount++;
+                        }
+                        UI.updateProgressBar(100, `${addedCount} nova(s) igreja(s) adicionada(s)!`);
+                    } catch (error) {
+                        console.error("Erro durante o escaneamento:", error);
+                        UI.updateProgressBar(100, 'Ocorreu um erro.');
+                    } finally {
+                        UI.hideProgressBar();
+                    }
+                },
+                findAndAddChurchFromMap: async (lat, lng) => {
+                    UI.showLoading('Identificando local...');
+                    try {
+                        FormLogic.reset();
+                        MapLogic.setLocationOnMap(lat, lng);
+                        const addrDetails = await API.fetchAddressForCoords(lat, lng);
+                        
+                        DOMElements.fields.bairro.value = addrDetails.bairro || '';
+                        DOMElements.fields.endereco.value = addrDetails.endereco || '';
+                        DOMElements.fields.name.placeholder = `Igreja em ${addrDetails.rua || 'local desconhecido'}`;
+                        
+                        UI.openPanel();
+                        DOMElements.fields.name.focus();
+                    } catch (error) {
+                        console.error("Erro no modo inspeção:", error);
+                    } finally {
+                        UI.hideLoading();
+                        isInspectMode = false;
+                        DOMElements.inspectModeBtn.classList.remove('active');
+                        document.body.classList.remove('inspect-mode-active');
+                    }
+                }
             };
 
             const debounce = (func, delay) => {
