@@ -90,17 +90,6 @@
     <!-- MODAIS E OUTROS ELEMENTOS FLUTUANTES -->
     <div id="floating-elements-container">
         <div id="modal-container"></div>
-
-        <!-- BARRA DE PROGRESSO PARA IMPORTAÇÃO -->
-        <div id="import-progress-bar" class="fixed bottom-4 right-4 z-50 bg-white p-3 rounded-lg shadow-lg w-full max-w-sm hidden transition-opacity duration-300 fade-in">
-            <div class="flex justify-between items-center mb-1">
-                <span id="import-progress-label" class="text-sm font-semibold text-slate-700">A importar...</span>
-                <span id="import-progress-text" class="text-sm font-medium text-slate-600">0%</span>
-            </div>
-            <div class="w-full bg-slate-200 rounded-full h-2">
-                <div id="import-progress-fill" class="bg-sky-600 h-2 rounded-full transition-all duration-300 ease-linear" style="width: 0%"></div>
-            </div>
-        </div>
     </div>
     
     <!-- OVERLAY DE CARREGAMENTO INICIAL -->
@@ -157,7 +146,7 @@
             const DENOMINATIONS = ['Católica', 'Luterana', 'Batista', 'Assembleia de Deus', 'Outra Evangélica', 'Outra'];
             const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
-            let state = { allChurches: [], map: null, db: null, igrejasCollectionRef: null, selectedChurchId: null, isLoaded: false, loadingTimeout: null };
+            let state = { allChurches: [], filteredChurches: [], map: null, db: null, igrejasCollectionRef: null, selectedChurchId: null, isLoaded: false, loadingTimeout: null };
 
             const debounce = (func, delay) => {
                 let timeout;
@@ -210,7 +199,6 @@
                         state.allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         UI.updateFilters();
                         this.filterAndRender();
-                        this.renderMarkers();
                         UI.hideLoading();
                     }, (error) => {
                         UI.showError("Erro de Permissão", `A sua base de dados bloqueou o acesso. Verifique as suas Regras de Segurança.`);
@@ -223,7 +211,7 @@
                     const denomination = document.getElementById('denomination-filter').value;
                     const neighborhood = document.getElementById('neighborhood-filter').value;
 
-                    const filtered = state.allChurches.filter(church => {
+                    state.filteredChurches = state.allChurches.filter(church => {
                         const matchesSearch = !searchTerm || (church.name || '').toLowerCase().includes(searchTerm);
                         const matchesCity = !city || church.city === city;
                         const matchesDenomination = !denomination || church.denomination === denomination;
@@ -231,12 +219,13 @@
                         return matchesSearch && matchesCity && matchesDenomination && matchesNeighborhood;
                     }).sort((a,b) => (a.name || '').localeCompare(b.name || ''));
                     
-                    UI.renderChurchList(filtered);
+                    UI.renderChurchList(state.filteredChurches);
+                    this.renderMarkers();
                 },
                 
                 renderMarkers() {
                     state.map.eachLayer(layer => { if (layer instanceof L.Marker) state.map.removeLayer(layer); });
-                    state.allChurches.forEach(church => {
+                    state.filteredChurches.forEach(church => {
                         if (church.coords) {
                             const marker = L.marker(church.coords).addTo(state.map);
                             marker.on('click', () => this.selectChurch(church.id));
@@ -347,23 +336,6 @@
                     setTimeout(() => {
                         toast.remove();
                     }, 4000);
-                },
-                ProgressBar: {
-                    show(label) {
-                        const bar = document.getElementById('import-progress-bar');
-                        bar.classList.remove('hidden');
-                        this.update(0, label);
-                    },
-                    hide() {
-                        setTimeout(() => document.getElementById('import-progress-bar').classList.add('hidden'), 3000);
-                    },
-                    update(percentage, label) {
-                        const p = Math.round(percentage);
-                        const bar = document.getElementById('import-progress-bar');
-                        bar.querySelector('#import-progress-fill').style.width = `${p}%`;
-                        bar.querySelector('#import-progress-text').textContent = `${p}%`;
-                        if (label) bar.querySelector('#import-progress-label').textContent = label;
-                    }
                 },
                 Modals: {
                     _createModal(id, content, maxWidth = 'max-w-lg') {
