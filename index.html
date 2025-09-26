@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Igrejas - Vale do Itajaí</title>
+    <title>Portal de Igrejas - Santa Catarina</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -49,9 +49,10 @@
                     <i class="fa fa-church text-2xl text-sky-600"></i>
                     <div>
                         <h1 class="text-lg font-bold text-slate-900">Portal de Igrejas</h1>
-                        <p class="text-xs text-slate-500">Encontre um lugar de comunidade no Vale do Itajaí</p>
+                        <p class="text-xs text-slate-500">Encontre um lugar de comunidade em Santa Catarina</p>
                     </div>
                 </div>
+                 <p id="church-count-display" class="text-xs text-slate-500 mt-2"></p>
             </header>
 
             <div class="p-4 flex-shrink-0 border-b border-slate-200 space-y-3">
@@ -126,9 +127,15 @@
             };
             
             const ADMIN_PASSWORD = "2308";
-            const MAP_CENTER = [-26.9194, -49.0661]; // Centro do Vale (Blumenau)
-            const CIDADES_VALE_ITAJAI = {
+            const MAP_CENTER = [-27.21, -49.64]; // Centro de SC
+            const SANTA_CATARINA_BOUNDS = { minLat: -29.4, maxLat: -25.9, minLon: -53.8, maxLon: -48.3 };
+            const CIDADES_SC = {
                 "Blumenau": { lat: -26.9194, lon: -49.0661, zoom: 12 },
+                "Florianópolis": { lat: -27.5954, lon: -48.5480, zoom: 12 },
+                "Joinville": { lat: -26.3031, lon: -48.8456, zoom: 12 },
+                "São José": { lat: -27.6146, lon: -48.6283, zoom: 13 },
+                "Chapecó": { lat: -27.1002, lon: -52.6152, zoom: 13 },
+                "Criciúma": { lat: -28.6775, lon: -49.3697, zoom: 13 },
                 "Itajaí": { lat: -26.9075, lon: -48.6619, zoom: 13 },
                 "Balneário Camboriú": { lat: -26.9905, lon: -48.6347, zoom: 14 },
                 "Brusque": { lat: -27.0983, lon: -48.9133, zoom: 13 },
@@ -194,7 +201,7 @@
                 },
 
                 initMap() {
-                    state.map = L.map('map-container').setView(MAP_CENTER, 9); // Zoom para ver o Vale
+                    state.map = L.map('map-container').setView(MAP_CENTER, 8);
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(state.map);
                 },
 
@@ -250,8 +257,8 @@
                     document.getElementById('search-input').addEventListener('input', () => this.filterAndRender());
                     document.getElementById('city-filter').addEventListener('change', (e) => {
                         const city = e.target.value;
-                        if (city && CIDADES_VALE_ITAJAI[city]) {
-                            state.map.setView([CIDADES_VALE_ITAJAI[city].lat, CIDADES_VALE_ITAJAI[city].lon], CIDADES_VALE_ITAJAI[city].zoom);
+                        if (city && CIDADES_SC[city]) {
+                            state.map.setView([CIDADES_SC[city].lat, CIDADES_SC[city].lon], CIDADES_SC[city].zoom);
                         }
                         UI.updateFilters();
                         this.filterAndRender();
@@ -263,7 +270,7 @@
 
                         if (neighborhood && city) {
                             UI.showLoading('A localizar bairro...');
-                            const coords = await API.geocodeAddress(`${neighborhood}, ${city}`);
+                            const coords = await API.geocodeAddress(`${neighborhood}, ${city}, Santa Catarina`);
                             UI.hideLoading();
                             if (coords) {
                                 state.map.setView([coords.lat, coords.lon], 15);
@@ -297,6 +304,9 @@
                 },
                 renderChurchList: (churches) => {
                     const listEl = document.getElementById('church-list');
+                    const countDisplay = document.getElementById('church-count-display');
+                    countDisplay.innerHTML = `A exibir <strong>${churches.length}</strong> de <strong>${state.allChurches.length}</strong> locais.`;
+
                     listEl.innerHTML = '';
                     if (churches.length === 0) { listEl.innerHTML = `<div class="p-4 text-center text-slate-500">Nenhuma igreja encontrada.</div>`; return; }
                     churches.forEach(church => {
@@ -318,7 +328,7 @@
                     const selectedCity = cityFilter.value;
 
                     // Cidades
-                    cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_VALE_ITAJAI).sort().map(c => `<option value="${c}" ${c === selectedCity ? 'selected' : ''}>${c}</option>`).join('');
+                    cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_SC).sort().map(c => `<option value="${c}" ${c === selectedCity ? 'selected' : ''}>${c}</option>`).join('');
 
                     // Denominações
                     denFilter.innerHTML = '<option value="">Todas as Denominações</option>' + DENOMINATIONS.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -371,7 +381,8 @@
                                 <div class="mb-4"><h4 class="font-semibold mb-2">Contacto</h4><p class="text-sm text-slate-600"><strong>Líder:</strong> ${church.leader || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Telefone:</strong> ${church.phone || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Website:</strong> ${church.website ? `<a href="${church.website}" target="_blank" class="text-sky-600 hover:underline">Visitar</a>` : 'Não informado'}</p></div>
                             </div>
                             <footer class="p-4 border-t flex gap-2">
-                                 <a href="https://www.google.com/maps/dir/?api=1&destination=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-sky-600 text-white font-semibold py-2 rounded-md hover:bg-sky-700 transition">Obter Rota</a>
+                                 <a href="https://www.google.com/maps/dir/?api=1&destination=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-sky-600 text-white font-semibold py-2 rounded-md hover:bg-sky-700 transition flex items-center justify-center gap-2"><i class="fa fa-route"></i> Rota</a>
+                                 <a href="https://www.google.com/maps?q&layer=c&cbll=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-amber-500 text-white font-semibold py-2 rounded-md hover:bg-amber-600 transition flex items-center justify-center gap-2"><i class="fa fa-street-view"></i> Ver Rua</a>
                                  <button class="edit-btn flex-1 bg-slate-200 font-semibold py-2 rounded-md hover:bg-slate-300">Editar</button>
                             </footer>`;
                         const modal = this._createModal('details-modal', content);
@@ -418,7 +429,7 @@
                         const content = `
                             <header class="p-4 border-b"><h2 class="text-xl font-bold">${isEditing ? 'Editar' : 'Adicionar'} Igreja</h2></header>
                             <div class="p-4 custom-scrollbar overflow-y-auto space-y-6">
-                                <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Informações Principais</legend><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"><div><label class="text-sm font-medium">Nome*</label><input id="form-name" type="text" class="w-full border-slate-300 rounded-md" value="${church.name || ''}"></div><div><label class="text-sm font-medium">Denominação</label><select id="form-denomination" class="w-full border-slate-300 rounded-md">${DENOMINATIONS.map(d => `<option value="${d}" ${church.denomination === d ? 'selected' : ''}>${d}</option>`)}</select></div><div><label class="text-sm font-medium">Cidade*</label><select id="form-city" class="w-full border-slate-300 rounded-md">${Object.keys(CIDADES_VALE_ITAJAI).map(c => `<option value="${c}" ${church.city === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div></div></fieldset>
+                                <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Informações Principais</legend><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"><div><label class="text-sm font-medium">Nome*</label><input id="form-name" type="text" class="w-full border-slate-300 rounded-md" value="${church.name || ''}"></div><div><label class="text-sm font-medium">Denominação</label><select id="form-denomination" class="w-full border-slate-300 rounded-md">${DENOMINATIONS.map(d => `<option value="${d}" ${church.denomination === d ? 'selected' : ''}>${d}</option>`)}</select></div><div><label class="text-sm font-medium">Cidade*</label><select id="form-city" class="w-full border-slate-300 rounded-md">${Object.keys(CIDADES_SC).map(c => `<option value="${c}" ${church.city === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div></div></fieldset>
                                 <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Horários de Atividades</legend><div id="schedule-container" class="mt-2 space-y-2">${scheduleHtml}</div></fieldset>
                                 <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Contacto</legend><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"><div><label class="text-sm font-medium">Líder</label><input id="form-leader" type="text" class="w-full border-slate-300 rounded-md" value="${church.leader || ''}"></div><div><label class="text-sm font-medium">Telefone</label><input id="form-phone" type="text" class="w-full border-slate-300 rounded-md" value="${church.phone || ''}"></div><div class="md:col-span-2"><label class="text-sm font-medium">Website</label><input id="form-website" type="text" class="w-full border-slate-300 rounded-md" value="${church.website || ''}"></div></div></fieldset>
                                 <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Localização no Mapa*</legend>
@@ -473,7 +484,7 @@
                                 query = `${rua}, ${document.getElementById('form-city').value}`;
                             } else { return; }
 
-                            const coords = await API.geocodeAddress(query);
+                            const coords = await API.geocodeAddress(query + ', Santa Catarina');
                             if (coords) updateLocation(coords.lat, coords.lon);
                         }, 800);
 
@@ -517,18 +528,18 @@
                             <header class="p-4 border-b flex justify-between items-center"><h2 class="text-xl font-bold">Ferramentas Administrativas</h2><button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button></header>
                             <div class="p-4 space-y-3">
                                 <button id="import-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Assistente de Importação Inteligente</button>
-                                <button id="clear-map-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Limpar Base de Dados</button>
+                                <button id="cleanup-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Limpar Locais Fora de SC</button>
                                 <button id="test-connection-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Testar Ligação</button>
                             </div>`;
                         const modal = this._createModal('admin-modal', content, 'max-w-md');
                         modal.classList.remove('hidden');
                         modal.querySelector('#import-btn').addEventListener('click', () => { modal.remove(); this.openImportAssistant(); });
-                        modal.querySelector('#clear-map-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'clear' }); });
+                        modal.querySelector('#cleanup-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'cleanup' }); });
                         modal.querySelector('#test-connection-btn').addEventListener('click', async () => { UI.showLoading('A testar...'); try { await getDocs(query(state.igrejasCollectionRef, limit(1))); alert('Ligação com Firebase OK!'); } catch(e) { alert(`Falha na ligação: ${e.message}`); } finally { UI.hideLoading(); }});
                     },
                     openConfirm({ action }) {
                         const options = {
-                            clear: { title: 'Limpar Base de Dados', message: 'Isto irá apagar TUDO. Requer senha.' }
+                            cleanup: { title: 'Limpar Locais Fora de SC', message: 'Isto irá apagar igrejas fora de Santa Catarina. Requer senha.' }
                         };
                         const content = `
                             <div class="p-6 text-center">
@@ -545,7 +556,7 @@
                         modal.querySelector('#confirm-action-btn').addEventListener('click', () => {
                             if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
                                 modal.remove();
-                                if (action === 'clear') Admin.clearMap();
+                                if (action === 'cleanup') Admin.cleanupOutsideSC();
                             } else {
                                 alert('Senha incorreta!');
                             }
@@ -566,7 +577,7 @@
                                         <div class="relative"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-300"></div></div><div class="relative flex justify-center text-sm"><span class="bg-white px-2 text-slate-500">Ou</span></div></div>
                                         <div><label class="text-sm font-medium">2. Procurar em Cidade/Bairro Específico</label>
                                             <div class="flex gap-2 mt-1">
-                                                <select id="import-city" class="w-1/2 border-slate-300 rounded-md">${Object.keys(CIDADES_VALE_ITAJAI).map(c => `<option value="${c}">${c}</option>`).join('')}</select>
+                                                <select id="import-city" class="w-1/2 border-slate-300 rounded-md">${Object.keys(CIDADES_SC).map(c => `<option value="${c}">${c}</option>`).join('')}</select>
                                                 <select id="import-neighborhood" class="w-1/2 border-slate-300 rounded-md"></select>
                                             </div>
                                         </div>
@@ -651,23 +662,21 @@
                         format: 'jsonv2',
                         bounded: 1,
                         limit: 50,
-                        amenity: 'place_of_worship'
+                        amenity: 'place_of_worship',
+                        countrycodes: 'br'
                     });
 
                     let cityForNewEntries = city;
 
                     if (bounds) {
-                        params.set('viewbox', `${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()},${bounds.getSouth()}`);
+                        const searchBounds = { minLon: Math.max(bounds.getWest(), SANTA_CATARINA_BOUNDS.minLon), minLat: Math.max(bounds.getSouth(), SANTA_CATARINA_BOUNDS.minLat), maxLon: Math.min(bounds.getEast(), SANTA_CATARINA_BOUNDS.maxLon), maxLat: Math.min(bounds.getNorth(), SANTA_CATARINA_BOUNDS.maxLat) };
+                        params.set('viewbox', `${searchBounds.minLon},${searchBounds.maxLat},${searchBounds.maxLon},${searchBounds.minLat}`);
                         cityForNewEntries = 'Não especificada';
-                    } else if (city && CIDADES_VALE_ITAJAI[city]) {
-                        const cityBounds = CIDADES_VALE_ITAJAI[city];
+                    } else if (city && CIDADES_SC[city]) {
+                        const cityBounds = CIDADES_SC[city];
                         params.set('viewbox', `${cityBounds.lon - 0.1},${cityBounds.lat + 0.1},${cityBounds.lon + 0.1},${cityBounds.lat - 0.1}`);
-                        if (neighborhood) {
-                           params.set('q', `${neighborhood}, ${city}`);
-                        }
-                    } else {
-                        return [];
-                    }
+                        if (neighborhood) params.set('q', `${neighborhood}, ${city}, Santa Catarina`);
+                    } else return [];
                     
                     const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
 
@@ -707,12 +716,30 @@
                     UI.ProgressBar.update(100, `Importação concluída!`);
                     UI.ProgressBar.hide();
                 },
-                async clearMap() { 
-                    UI.showLoading('A apagar...');
+                async cleanupOutsideSC() {
+                    UI.showLoading('A verificar dados...');
+                    const toDelete = [];
+                    state.allChurches.forEach(church => {
+                        if (church.coords) {
+                            const [lat, lon] = church.coords;
+                            if (lat < SANTA_CATARINA_BOUNDS.minLat || lat > SANTA_CATARINA_BOUNDS.maxLat || lon < SANTA_CATARINA_BOUNDS.minLon || lon > SANTA_CATARINA_BOUNDS.maxLon) {
+                                toDelete.push(church.id);
+                            }
+                        }
+                    });
+
+                    if (toDelete.length === 0) {
+                        UI.hideLoading();
+                        alert('Nenhum local fora de Santa Catarina encontrado.');
+                        return;
+                    }
+
+                    UI.showLoading(`A remover ${toDelete.length} locais...`);
                     const batch = writeBatch(state.db);
-                    state.allChurches.forEach(church => batch.delete(doc(state.igrejasCollectionRef, church.id)));
+                    toDelete.forEach(id => batch.delete(doc(state.igrejasCollectionRef, id)));
                     await batch.commit();
                     UI.hideLoading();
+                    alert(`${toDelete.length} locais fora de Santa Catarina foram removidos.`);
                 }
             };
             const API = {
@@ -734,12 +761,19 @@
                     catch (e) { console.error("Erro ao buscar CEP:", e); return null; }
                 },
                 async geocodeAddress(addressQuery) {
-                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(addressQuery)}`;
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(addressQuery)}&countrycodes=br&limit=1`;
                     try {
-                        const res = await fetch(url); const data = await res.json();
+                        const res = await fetch(url);
+                        const data = await res.json();
                         if (data && data.length > 0) {
-                             return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-                        } return null;
+                             const result = data[0];
+                             const lat = parseFloat(result.lat);
+                             const lon = parseFloat(result.lon);
+                             if (lat >= SANTA_CATARINA_BOUNDS.minLat && lat <= SANTA_CATARINA_BOUNDS.maxLat && lon >= SANTA_CATARINA_BOUNDS.minLon && lon <= SANTA_CATARINA_BOUNDS.maxLon) {
+                                return { lat, lon };
+                             }
+                        } 
+                        return null;
                     } catch (e) { console.error("Erro no geocoding:", e); return null; }
                 }
             };
