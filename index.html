@@ -595,7 +595,7 @@
             
             const API = {
                 fetchAddressForCoords: async (lat, lon) => {
-                    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&addressdetails=1&zoom=18`;
                     try {
                         const response = await fetch(url);
                         const data = await response.json();
@@ -604,10 +604,33 @@
                             const rua = addr.road || '';
                             const numero = addr.house_number || '';
                             const bairro = addr.suburb || addr.city_district || '';
-                            return { endereco: numero ? `${rua}, ${numero}` : rua, bairro: bairro, rua: rua, numero: numero };
+                            let nomePOI = '';
+
+                            // O nome do POI é frequentemente a primeira parte do display_name
+                            if (data.display_name) {
+                                const firstPart = data.display_name.split(',')[0];
+                                if (isNaN(parseInt(firstPart))) { // Garante que não é apenas um número de casa
+                                    nomePOI = firstPart;
+                                }
+                            }
+                            
+                            // Como fallback, verificar tags comuns de POI no objeto de endereço
+                            if (!nomePOI) {
+                                 nomePOI = addr.amenity || addr.shop || addr.building || addr.tourism || addr.leisure || '';
+                            }
+
+                            return {
+                                nome: nomePOI,
+                                endereco: numero ? `${rua}, ${numero}` : rua,
+                                bairro: bairro,
+                                rua: rua,
+                                numero: numero
+                            };
                         }
-                    } catch (error) { console.error("Erro no reverse geocode:", error); }
-                    return { endereco: '', bairro: '', rua: '', numero: '' };
+                    } catch (error) {
+                        console.error("Erro no reverse geocode:", error);
+                    }
+                    return { nome: '', endereco: '', bairro: '', rua: '', numero: '' };
                 },
                 searchAddress: async (query) => {
                     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Blumenau')}&addressdetails=1&limit=5`;
@@ -786,10 +809,23 @@
                         
                         DOMElements.fields.bairro.value = addrDetails.bairro || '';
                         DOMElements.fields.endereco.value = addrDetails.endereco || '';
-                        DOMElements.fields.name.placeholder = `Igreja em ${addrDetails.rua || 'local desconhecido'}`;
+                        DOMElements.fields.numero.value = addrDetails.numero || ''; // Preencher o campo número
+                        
+                        // Preencher o nome se encontrado, senão usar placeholder
+                        if (addrDetails.nome) {
+                            DOMElements.fields.name.value = addrDetails.nome;
+                        } else {
+                             DOMElements.fields.name.placeholder = `Igreja em ${addrDetails.rua || 'local desconhecido'}`;
+                        }
                         
                         UI.openPanel();
-                        DOMElements.fields.name.focus();
+                        // Focar no próximo campo se o nome já foi preenchido
+                        if (addrDetails.nome) {
+                            DOMElements.fields.pastor.focus();
+                        } else {
+                            DOMElements.fields.name.focus();
+                        }
+
                     } catch (error) {
                         console.error("Erro no modo inspeção:", error);
                     } finally {
@@ -1084,4 +1120,5 @@
     </script>
 </body>
 </html>
+
 
