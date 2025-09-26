@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa Colaborativo de Igrejas - Blumenau</title>
+    <title>Painel do Mapa de Igrejas - Blumenau</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Leaflet.js (CSS e JS) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <!-- Leaflet.awesome-markers (Ícones) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css">
@@ -20,1167 +20,577 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
-        /* Estilos personalizados para complementar o Tailwind e o Leaflet */
-        .leaflet-popup-content-wrapper {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            border-radius: 12px;
-        }
-        .leaflet-popup-content {
-            padding: 16px;
-        }
-        .leaflet-popup-content h3 {
-            font-size: 1.25rem; /* Aumentado */
-            font-weight: 700; /* Mais forte */
-            margin-bottom: 12px;
-            color: #111827;
-        }
-        .leaflet-popup-content p {
-            margin: 6px 0;
-            font-size: 0.95rem; /* Levemente maior */
-            color: #374151;
-            display: flex;
-            align-items: center;
-        }
-        .leaflet-popup-content strong {
-            color: #1f2937;
-        }
-        #map-container {
-             cursor: grab;
-        }
-        .leaflet-grabbing #map-container {
-            cursor: grabbing;
-        }
-        /* Custom scrollbar */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #e5e7eb;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #a1a1aa;
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #71717a;
-        }
-        .schedule-day-fields { display: none; }
-        .schedule-day-fields.active { display: block; }
+        /* Scrollbar Personalizada */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
-        /* Animação para o painel lateral */
-        #side-panel {
-            transition: transform 0.3s ease-in-out;
-        }
-        #side-panel.closed {
-            transform: translateX(100%);
+        /* Estilos para o cartão de igreja selecionado */
+        .church-card.selected {
+            background-color: #e0f2fe; /* bg-sky-100 */
+            border-left-width: 4px;
+            border-color: #0ea5e9; /* border-sky-500 */
         }
         
-        /* Estilos para o Modo Inspeção */
-        #inspect-mode-btn.active {
-            background-color: #2563eb; /* bg-blue-600 */
-            color: white;
-        }
-        body.inspect-mode-active #map-container {
-            cursor: crosshair;
-        }
+        /* Transições suaves */
+        .transition-all { transition: all 0.3s ease-in-out; }
+
+        /* Animação para o modal */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); }
+        .modal-leave { opacity: 1; transform: scale(1); }
+        .modal-leave-active { opacity: 0; transform: scale(0.95); }
     </style>
 </head>
-<body class="h-full bg-gray-100 antialiased overflow-hidden">
+<body class="h-full bg-slate-100 antialiased overflow-hidden text-slate-800">
 
-    <div id="app-container" class="relative h-full w-full">
-        <!-- O Contêiner do Mapa -->
-        <div id="map-container" class="h-full w-full"></div>
+    <div id="app-container" class="h-full w-full flex flex-col md:flex-row">
+        
+        <!-- PAINEL ESQUERDO: LISTA E FILTROS -->
+        <div id="list-panel" class="w-full md:w-1/3 lg:w-1/4 h-1/2 md:h-full flex flex-col bg-white border-r border-slate-200">
+            <!-- Cabeçalho do Painel -->
+            <div class="p-4 border-b border-slate-200 flex-shrink-0">
+                <h1 class="text-xl font-bold text-slate-900">Mapa de Igrejas</h1>
+                <p class="text-sm text-slate-500">Blumenau e região</p>
+            </div>
 
-        <!-- Overlays do Mapa (Controles, Pesquisa, etc.) -->
-        <div class="absolute top-0 left-0 p-2 md:p-4 z-[999] w-full md:w-auto">
-            <div class="relative"> <!-- Add relative positioning for the results dropdown -->
-                <div class="bg-white/90 backdrop-blur-sm p-2 rounded-xl shadow-lg flex items-center space-x-2 w-full md:max-w-md">
-                    <i class="fa fa-search text-gray-400 px-2"></i>
-                    <input type="text" id="search-input" placeholder="Pesquisar igreja ou buscar endereço..." class="w-full bg-transparent focus:outline-none text-gray-800 placeholder-gray-500">
-                    <button id="clear-search-btn" class="hidden text-gray-500 hover:text-gray-800 pr-2">
-                        <i class="fa fa-times"></i>
-                    </button>
+            <!-- Pesquisa e Filtros -->
+            <div class="p-4 border-b border-slate-200 flex-shrink-0">
+                <div class="relative mb-3">
+                    <i class="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" placeholder="Pesquisar por nome ou bairro..." class="w-full bg-slate-100 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-                <!-- Search Results Dropdown -->
-                <div id="search-results-container" class="hidden absolute top-full mt-2 w-full md:max-w-md bg-white rounded-xl shadow-lg overflow-hidden max-h-72 overflow-y-auto custom-scrollbar">
-                    <!-- Results will be injected here by JS -->
+                <div id="filter-container" class="flex flex-wrap gap-2">
+                    <!-- Filtros serão injetados aqui -->
                 </div>
             </div>
-        </div>
 
+            <!-- Lista de Igrejas -->
+            <div id="church-list" class="flex-grow overflow-y-auto custom-scrollbar p-2">
+                <!-- Cartões de igreja serão injetados aqui -->
+            </div>
 
-        <!-- Controles do Mapa (à direita) -->
-        <div class="absolute top-4 right-4 z-[999] flex flex-col space-y-2">
-             <button id="toggle-panel-btn" class="bg-white/90 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-gray-800 hover:bg-gray-200 transition" title="Adicionar com Formulário Vazio">
-                <i class="fa fa-plus text-lg"></i>
-            </button>
-            <button id="inspect-mode-btn" class="bg-white/90 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-gray-800 hover:bg-gray-200 transition" title="Adicionar Igreja pelo Mapa (Modo Inspeção)">
-                <i class="fa fa-crosshairs text-lg"></i>
-            </button>
-        </div>
-
-        <div class="absolute bottom-10 right-4 z-[999] flex flex-col space-y-2">
-            <button id="user-location-btn" class="bg-white/90 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-blue-600 hover:bg-gray-200 transition" title="Minha Localização">
-                <i class="fa fa-location-crosshairs text-lg"></i>
-            </button>
-        </div>
-        
-        <!-- Contador de Igrejas (à esquerda, inferior) -->
-        <div id="church-counter" class="absolute bottom-4 left-4 z-[999] bg-white/90 backdrop-blur-sm py-2 px-4 rounded-lg shadow-lg cursor-pointer hover:bg-gray-50 transition">
-            <span class="text-gray-800 font-semibold">Carregando igrejas...</span>
-        </div>
-
-        <!-- Painel Lateral para Adicionar/Editar -->
-        <div id="side-panel" class="absolute top-0 right-0 h-full w-full max-w-lg bg-gray-50 shadow-2xl z-[1000] flex flex-col closed">
-             <div class="flex-shrink-0 bg-white/80 backdrop-blur-sm flex justify-between items-center p-6 border-b">
-                <h3 id="panel-title" class="text-2xl font-bold text-gray-900">Adicionar Nova Igreja</h3>
-                <button id="close-panel-btn" class="text-gray-500 hover:text-gray-900 transition-colors">
-                    <i class="fa fa-times fa-xl"></i>
+            <!-- Rodapé do Painel -->
+            <div class="p-4 border-t border-slate-200 flex-shrink-0">
+                <button id="add-church-btn" class="w-full bg-sky-600 text-white font-semibold py-3 rounded-lg hover:bg-sky-700 transition-all flex items-center justify-center gap-2">
+                    <i class="fa fa-plus"></i> Adicionar Nova Igreja
                 </button>
             </div>
-            <div class="flex-grow overflow-y-auto custom-scrollbar p-6">
-                <form id="church-form" class="space-y-5">
-                    <!-- Importar do Google Maps -->
-                    <div>
-                        <label for="gmaps-url" class="block text-sm font-medium text-gray-700">Importar do Google Maps</label>
-                        <div class="mt-1 flex rounded-lg shadow-sm">
-                            <input type="url" id="gmaps-url" placeholder="Cole o link do Google Maps aqui" class="flex-1 block w-full rounded-none rounded-l-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                            <button type="button" id="import-gmaps-btn" title="Importar dados do link" class="inline-flex items-center px-4 rounded-r-lg border border-l-0 border-gray-300 bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
-                                <i class="fa fa-download"></i>
-                            </button>
-                        </div>
-                        <div id="import-message-area" class="mt-1 text-xs h-4"></div>
-                    </div>
-
-                    <div class="relative">
-                        <div class="absolute inset-0 flex items-center" aria-hidden="true">
-                            <div class="w-full border-t border-gray-300"></div>
-                        </div>
-                        <div class="relative flex justify-center">
-                            <span class="bg-gray-50 px-2 text-sm text-gray-500">ou</span>
-                        </div>
-                    </div>
-
-                    <p id="coords-info" class="text-sm text-gray-700 bg-blue-50 border border-blue-200 p-3 rounded-lg text-center flex items-center justify-center"><i class="fa fa-map-pin mr-2 text-blue-500"></i>Clique no mapa ou use o CEP para localizar.</p>
-                    
-                    <!-- Campos do Formulário -->
-                    <input type="hidden" id="church-coords-lat">
-                    <input type="hidden" id="church-coords-lng">
-                    
-                    <div><label for="church-name" class="block text-sm font-medium text-gray-700">Nome da Igreja*</label><input type="text" id="church-name" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></div>
-                    <div><label for="church-pastor" class="block text-sm font-medium text-gray-700">Líder / Pastor / Padre</label><input type="text" id="church-pastor" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label for="church-cep" class="block text-sm font-medium text-gray-700">CEP</label><input type="text" id="church-cep" placeholder="Apenas números" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"><div id="cep-message-area" class="mt-1 text-xs h-4"></div></div>
-                        <div><label for="church-numero" class="block text-sm font-medium text-gray-700">Número</label><input type="text" id="church-numero" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></div>
-                    </div>
-                     <div><label for="church-bairro" class="block text-sm font-medium text-gray-700">Bairro</label><input type="text" id="church-bairro" class="mt-1 block w-full bg-gray-200 border-gray-300 rounded-lg shadow-sm sm:text-sm" readonly></div>
-                    <div><label for="church-endereco" class="block text-sm font-medium text-gray-700">Endereço Completo</label><input type="text" id="church-endereco" class="mt-1 block w-full bg-gray-200 border-gray-300 rounded-lg shadow-sm sm:text-sm" readonly></div>
-
-                    <!-- Horários -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Horários e Atividades</label>
-                        <div id="horarios-container" class="space-y-3"></div>
-                    </div>
-
-                    <div><label for="church-contato" class="block text-sm font-medium text-gray-700">Telefone Fixo</label><input type="tel" id="church-contato" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></div>
-                    <div><label for="church-whatsapp" class="block text-sm font-medium text-gray-700">WhatsApp</label><input type="tel" id="church-whatsapp" placeholder="(47) 9XXXX-XXXX" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></div>
-                    <div><label for="church-redes" class="block text-sm font-medium text-gray-700">Rede Social (URL)</label><input type="url" id="church-redes" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></div>
-                </form>
-            </div>
-             <div class="flex-shrink-0 bg-white/80 backdrop-blur-sm p-6 border-t mt-auto space-y-3">
-                 <div id="message-area" class="text-sm text-center h-5"></div>
-                 <button type="button" id="save-church-btn" class="w-full bg-blue-600 text-white py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition">Adicionar Igreja</button>
-                 <button type="button" id="cancel-edit-btn" style="display: none;" class="w-full bg-gray-600 text-white py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition">Cancelar Edição</button>
-            </div>
         </div>
 
-        <!-- Barra de Progresso para Escaneamento -->
-        <div id="scan-progress-bar" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-[999] bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg w-full max-w-sm hidden transition-opacity duration-300">
-            <div class="flex justify-between items-center mb-1">
-                <span id="scan-progress-label" class="text-sm font-semibold text-gray-700">Escaneando...</span>
-                <span id="scan-progress-text" class="text-sm font-medium text-gray-600">0%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                <div id="scan-progress-fill" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-linear" style="width: 0%"></div>
-            </div>
-        </div>
+        <!-- PAINEL DIREITO: MAPA -->
+        <div id="map-container" class="w-full md:w-2/3 lg:w-3/4 h-1/2 md:h-full"></div>
+
     </div>
 
-    <!-- Modal: Lista de Igrejas -->
-    <div id="church-list-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 z-[1001] hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl m-4 flex flex-col max-h-[90vh]">
-             <div class="flex justify-between items-center p-5 border-b bg-gray-50/50 rounded-t-xl">
-                <h2 class="text-xl font-bold text-gray-900">Lista de Igrejas por Bairro</h2>
-                <button class="modal-close-btn text-gray-500 hover:text-gray-900 transition"><i class="fa fa-times fa-lg"></i></button>
+    <!-- MODAL PARA ADICIONAR/EDITAR IGREJA -->
+    <div id="church-modal" class="fixed inset-0 bg-black/60 z-[1001] hidden items-center justify-center p-4 transition-all modal-enter">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <!-- Cabeçalho do Modal -->
+            <div class="flex justify-between items-center p-5 border-b">
+                <h2 id="modal-title" class="text-2xl font-bold text-slate-900">Adicionar Nova Igreja</h2>
+                <button id="close-modal-btn" class="text-slate-500 hover:text-slate-900 transition"><i class="fa fa-times fa-lg"></i></button>
             </div>
-            <div id="church-list-content" class="p-6 overflow-y-auto custom-scrollbar flex-grow"></div>
-             <div class="flex justify-between items-center p-5 border-t bg-gray-50/50 rounded-b-xl">
-                <span class="text-sm text-gray-700 font-medium">Funções Administrativas</span>
-                <div class="flex items-center">
-                     <button id="scan-map-btn" class="bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-blue-700 transition" title="Escanear mapa por novas igrejas"><i class="fa fa-search mr-2"></i>Escanear Mapa</button>
-                    <button id="clear-map-btn" class="bg-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-red-700 transition ml-2" title="Apagar todos os dados do mapa"><i class="fa fa-trash-alt mr-2"></i>Limpar Mapa</button>
-                    <button id="test-db-connection-btn" class="bg-green-600 text-white text-sm font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-green-700 transition ml-2" title="Testar a ligação com a base de dados"><i class="fa fa-database mr-2"></i>Testar Ligação</button>
+            
+            <!-- Conteúdo do Formulário -->
+            <form id="church-form" class="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-6">
+                <!-- Campos serão injetados aqui dependendo do passo -->
+            </form>
+
+            <!-- Rodapé do Modal (Navegação e Salvar) -->
+            <div class="p-5 border-t bg-slate-50/50 rounded-b-xl flex justify-between items-center">
+                <button type="button" id="prev-step-btn" class="bg-slate-200 text-slate-800 font-semibold py-2 px-6 rounded-lg hover:bg-slate-300 transition hidden">Anterior</button>
+                <div id="step-indicator" class="text-sm text-slate-500">Passo 1 de 3</div>
+                <div>
+                    <button type="button" id="next-step-btn" class="bg-sky-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-sky-700 transition">Próximo</button>
+                    <button type="button" id="save-church-btn" class="bg-green-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-green-700 transition hidden">Salvar Igreja</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Modal: Confirmação Genérica (para Excluir, Limpar, Escanear) -->
-    <div id="confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 z-[1002] hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-md m-4 p-8 text-center">
-            <h3 id="confirm-title" class="text-xl font-bold text-gray-900"></h3>
-            <p id="confirm-message" class="mt-3 text-base text-gray-600"></p>
-            <div id="password-field-container" class="mt-6 hidden">
-                <label for="admin-password" class="sr-only">Senha de Administrador</label>
-                <input type="password" id="admin-password" placeholder="Senha de Administrador" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-center">
-                <p id="password-error" class="text-red-500 text-xs mt-1 h-4"></p>
-            </div>
-            <div class="mt-8 flex justify-center space-x-4">
-                <button id="confirm-action-btn" class="px-8 py-2.5 rounded-lg text-white font-semibold"></button>
-                <button id="cancel-action-btn" class="px-8 py-2.5 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition">Cancelar</button>
+    
+    <!-- MODAL DE CONFIRMAÇÃO -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/60 z-[1002] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <h3 id="confirm-title" class="text-lg font-bold text-slate-900">Confirmar Ação</h3>
+            <p id="confirm-message" class="mt-2 text-sm text-slate-600">Tem a certeza?</p>
+            <div class="mt-6 flex justify-center gap-4">
+                <button id="confirm-cancel-btn" class="px-6 py-2 bg-slate-200 text-slate-800 font-semibold rounded-lg hover:bg-slate-300">Cancelar</button>
+                <button id="confirm-action-btn" class="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Confirmar</button>
             </div>
         </div>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-white/60 backdrop-blur-sm z-[2000] flex flex-col items-center justify-center">
-        <i class="fa fa-church fa-spin text-5xl text-blue-600"></i>
-        <p class="mt-4 text-gray-800 font-semibold text-lg">Carregando mapa...</p>
+    <!-- OVERLAY DE CARREGAMENTO -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white/70 backdrop-blur-sm z-[2000] flex flex-col items-center justify-center">
+        <i class="fa fa-church fa-spin text-6xl text-sky-600"></i>
+        <p id="loading-text" class="mt-4 text-slate-800 font-semibold text-lg">A carregar mapa...</p>
     </div>
-
 
     <script type="module">
         // Importações do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc, writeBatch, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         document.addEventListener('DOMContentLoaded', () => {
-            // --- INSERIR CONFIGURAÇÃO DO FIREBASE AQUI ---
+
+            // =================================================================================
+            // CONFIGURAÇÃO DO FIREBASE
+            // =================================================================================
             const USER_FIREBASE_CONFIG = {
-                apiKey: "AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
-                authDomain: "controle-de-igrejas.firebaseapp.com",
-                projectId: "controle-de-igrejas",
-                storageBucket: "controle-de-igrejas.firebasestorage.app",
-                messagingSenderId: "457376397325",
-                appId: "1:457376397325:web:aacc6cef3e91390314fd44",
-                measurementId: "G-PENC7PPT4M"
+                apiKey:"AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
+                authDomain:"controle-de-igrejas.firebaseapp.com",
+                projectId:"controle-de-igrejas",
+                storageBucket:"controle-de-igrejas.firebasestorage.app",
+                messagingSenderId:"457376397325",
+                appId:"1:457376397325:web:aacc6cef3e91390314fd44",
+                measurementId:"G-PENC7PPT4M"
             };
-            // --- FIM DA CONFIGURAÇÃO ---
+            // =================================================================================
 
-            // --- CONSTANTES E VARIÁVEIS GLOBAIS DA APLicação ---
-            const ADMIN_PASSWORD = "2308";
+            // --- CONSTANTES E ESTADO GLOBAL ---
             const MAP_CENTER = [-26.9194, -49.0661];
-            const INITIAL_ZOOM = 13;
-            const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+            const DENOMINATIONS = {
+                'Católica': { color: 'red', icon: 'cross' },
+                'Luterana': { color: 'darkblue', icon: 'book' },
+                'Batista': { color: 'blue', icon: 'bible' },
+                'Assembleia de Deus': { color: 'orange', icon: 'fire' },
+                'Outra Evangélica': { color: 'purple', icon: 'hand-holding-heart' },
+                'Outra': { color: 'gray', icon: 'church' }
+            };
 
-            // Variáveis de estado
-            let allChurches = [], displayedChurches = [], allMarkers = [];
-            let tempMarker = null, editingId = null, currentStreet = '', isInspectMode = false;
+            let state = {
+                allChurches: [],
+                filteredChurches: [],
+                allMarkers: new Map(),
+                selectedChurchId: null,
+                activeFilter: 'Todas',
+                isEditing: false,
+                currentFormStep: 1
+            };
             
-            // Variáveis de inicialização (Firebase, Mapa)
-            let app, db, auth, igrejasCollectionRef, map;
+            let map, db, igrejasCollectionRef;
 
-            // --- SELETORES DE DOM (para evitar repetição) ---
-            const DOMElements = {
-                loadingOverlay: document.getElementById('loading-overlay'),
-                sidePanel: document.getElementById('side-panel'),
-                togglePanelBtn: document.getElementById('toggle-panel-btn'),
-                closePanelBtn: document.getElementById('close-panel-btn'),
-                inspectModeBtn: document.getElementById('inspect-mode-btn'),
-                form: document.getElementById('church-form'),
-                panelTitle: document.getElementById('panel-title'),
-                saveBtn: document.getElementById('save-church-btn'),
-                cancelEditBtn: document.getElementById('cancel-edit-btn'),
-                coordsInfo: document.getElementById('coords-info'),
-                messageArea: document.getElementById('message-area'),
-                importMessageArea: document.getElementById('import-message-area'),
-                cepMessageArea: document.getElementById('cep-message-area'),
-                churchListModal: document.getElementById('church-list-modal'),
-                churchListContent: document.getElementById('church-list-content'),
-                churchCounter: document.getElementById('church-counter'),
-                searchInput: document.getElementById('search-input'),
-                clearSearchBtn: document.getElementById('clear-search-btn'),
-                searchResultsContainer: document.getElementById('search-results-container'),
-                confirmModal: document.getElementById('confirm-modal'),
-                gmapsUrlInput: document.getElementById('gmaps-url'),
-                horariosContainer: document.getElementById('horarios-container'),
-                scanProgressBar: document.getElementById('scan-progress-bar'),
-                scanProgressLabel: document.getElementById('scan-progress-label'),
-                scanProgressText: document.getElementById('scan-progress-text'),
-                scanProgressFill: document.getElementById('scan-progress-fill'),
-                fields: {
-                    lat: document.getElementById('church-coords-lat'),
-                    lng: document.getElementById('church-coords-lng'),
-                    name: document.getElementById('church-name'),
-                    pastor: document.getElementById('church-pastor'),
-                    cep: document.getElementById('church-cep'),
-                    numero: document.getElementById('church-numero'),
-                    bairro: document.getElementById('church-bairro'),
-                    endereco: document.getElementById('church-endereco'),
-                    contato: document.getElementById('church-contato'),
-                    whatsapp: document.getElementById('church-whatsapp'),
-                    redes: document.getElementById('church-redes'),
+            // --- INICIALIZAÇÃO ---
+            function initializeApp() {
+                UI.showLoading('A inicializar...');
+                if (!USER_FIREBASE_CONFIG || !USER_FIREBASE_CONFIG.apiKey || USER_FIREBASE_CONFIG.apiKey.includes("COLE_SUA")) {
+                    UI.showError("Configuração Incompleta", "Por favor, cole as credenciais do seu projeto Firebase no ficheiro HTML para continuar.");
+                    return;
+                }
+
+                try {
+                    const firebaseApp = initializeApp(USER_FIREBASE_CONFIG);
+                    db = getFirestore(firebaseApp);
+                    const auth = getAuth(firebaseApp);
+                    igrejasCollectionRef = collection(db, "igrejas");
+
+                    signInAnonymously(auth).then(() => {
+                        initializeMap();
+                        setupEventListeners();
+                        fetchData();
+                    }).catch(err => {
+                        UI.showError("Erro de Autenticação", "Não foi possível ligar ao serviço de autenticação. Verifique os seus 'Domínios autorizados' no painel do Firebase.");
+                    });
+                } catch (error) {
+                    UI.showError("Erro Crítico na Inicialização", `Ocorreu um erro ao iniciar o Firebase. Verifique as suas credenciais. Detalhe: ${error.message}`);
+                }
+            }
+
+            function initializeMap() {
+                map = L.map('map-container').setView(MAP_CENTER, 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+            }
+
+            function fetchData() {
+                UI.showLoading('A carregar dados...');
+                onSnapshot(igrejasCollectionRef, (snapshot) => {
+                    state.allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    Logic.applyFilters();
+                    UI.renderFilterButtons();
+                    UI.renderChurchList();
+                    UI.renderMarkers();
+                    UI.hideLoading();
+                }, (error) => {
+                     const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
+                     UI.showError("Erro de Permissão", `A sua base de dados bloqueou o acesso. Certifique-se de que iniciou a base de dados em <b>modo de teste</b>. <a href="${rulesUrl}" target="_blank" class="text-sky-600 underline font-semibold">Clique aqui para verificar as suas Regras de Segurança</a>.`);
+                });
+            }
+
+            // --- LÓGICA DE NEGÓCIO ---
+            const Logic = {
+                applyFilters(searchText = document.getElementById('search-input').value.toLowerCase()) {
+                    let churches = state.allChurches;
+                    if (state.activeFilter !== 'Todas') {
+                        churches = churches.filter(c => c.denomination === state.activeFilter);
+                    }
+                    if (searchText) {
+                        churches = churches.filter(c => 
+                            c.name.toLowerCase().includes(searchText) || 
+                            (c.neighborhood && c.neighborhood.toLowerCase().includes(searchText))
+                        );
+                    }
+                    state.filteredChurches = churches.sort((a, b) => a.name.localeCompare(b.name));
+                },
+                selectChurch(churchId) {
+                    if (state.selectedChurchId === churchId) {
+                        // Se já estiver selecionado, não faz nada para evitar re-renderizações desnecessárias
+                        return;
+                    }
+                    state.selectedChurchId = churchId;
+
+                    // Atualiza a UI da lista
+                    document.querySelectorAll('.church-card').forEach(card => {
+                        card.classList.toggle('selected', card.dataset.id === churchId);
+                        if (card.dataset.id === churchId) {
+                            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    });
+
+                    // Atualiza o mapa
+                    const marker = state.allMarkers.get(churchId);
+                    if (marker) {
+                        map.setView(marker.getLatLng(), 16);
+                        marker.openPopup();
+                    }
+                },
+                confirmDelete(churchId) {
+                    const church = state.allChurches.find(c => c.id === churchId);
+                    if (!church) return;
+                    UI.Confirmation.show({
+                        title: 'Confirmar Exclusão',
+                        message: `Tem a certeza de que quer apagar <strong>${church.name}</strong>? Esta ação é irreversível.`,
+                        actionText: 'Apagar',
+                        onConfirm: () => this.deleteChurch(churchId)
+                    });
+                },
+                async deleteChurch(churchId) {
+                    UI.showLoading('A apagar...');
+                    try {
+                        await deleteDoc(doc(igrejasCollectionRef, churchId));
+                        if (state.selectedChurchId === churchId) {
+                            state.selectedChurchId = null;
+                        }
+                    } catch (error) {
+                        console.error("Erro ao apagar:", error);
+                        alert("Ocorreu um erro ao apagar a igreja.");
+                    } finally {
+                        UI.hideLoading();
+                    }
+                },
+                async saveChurch() {
+                    UI.showLoading("A salvar...");
+                    const formData = UI.Modal.getFormData();
+                    if (!formData.name || !formData.denomination || !formData.coords) {
+                        alert("Nome, denominação e localização são obrigatórios.");
+                        UI.hideLoading();
+                        return;
+                    }
+
+                    try {
+                        if (state.isEditing) {
+                            await setDoc(doc(igrejasCollectionRef, state.selectedChurchId), formData);
+                        } else {
+                            await addDoc(igrejasCollectionRef, formData);
+                        }
+                        UI.Modal.close();
+                    } catch (error) {
+                        console.error("Erro ao salvar:", error);
+                        alert("Ocorreu um erro ao salvar. Verifique o console para detalhes.");
+                    } finally {
+                        UI.hideLoading();
+                    }
                 }
             };
 
-            const churchIcon = L.AwesomeMarkers.icon({ icon: 'church', markerColor: 'darkred', prefix: 'fa' });
-            const tempIcon = L.AwesomeMarkers.icon({ icon: 'plus', markerColor: 'blue', prefix: 'fa' });
-            let churchLayer; // Será inicializado com o mapa
-            
-            // --- MÓDULOS DE LÓGICA (UI, Mapa, Formulário, API, Admin) ---
-            
-            // Módulo para manipular a interface do usuário
+            // --- MANIPULAÇÃO DA UI ---
             const UI = {
                 showLoading: (message) => {
-                    DOMElements.loadingOverlay.classList.remove('hidden');
-                    DOMElements.loadingOverlay.querySelector('p').textContent = message || 'Carregando...';
+                    document.getElementById('loading-overlay').classList.remove('hidden');
+                    document.getElementById('loading-text').textContent = message;
                 },
-                hideLoading: () => DOMElements.loadingOverlay.classList.add('hidden'),
+                hideLoading: () => document.getElementById('loading-overlay').classList.add('hidden'),
                 showError: (title, message) => {
-                    DOMElements.loadingOverlay.classList.remove('hidden');
-                    DOMElements.loadingOverlay.innerHTML = `
-                        <div class="text-center p-8 max-w-lg mx-auto bg-white rounded-lg shadow-lg">
-                            <i class="fa fa-exclamation-triangle text-5xl text-red-500"></i>
-                            <p class="mt-4 text-gray-800 font-semibold text-lg">${title}</p>
-                            <div class="mt-2 text-gray-600 text-sm">${message}</div>
+                    const overlay = document.getElementById('loading-overlay');
+                    overlay.innerHTML = `
+                        <div class="text-center p-8 max-w-lg mx-auto bg-white rounded-lg shadow-xl border border-red-200">
+                            <i class="fa fa-times-circle text-6xl text-red-500"></i>
+                            <h2 class="mt-4 text-2xl font-bold text-slate-800">${title}</h2>
+                            <p class="mt-2 text-slate-600">${message}</p>
+                        </div>`;
+                    overlay.classList.remove('hidden');
+                },
+                renderFilterButtons() {
+                    const container = document.getElementById('filter-container');
+                    container.innerHTML = '';
+                    const filters = ['Todas', ...Object.keys(DENOMINATIONS)];
+                    filters.forEach(filter => {
+                        const button = document.createElement('button');
+                        button.textContent = filter;
+                        button.dataset.filter = filter;
+                        button.className = `px-3 py-1 text-sm font-semibold rounded-full transition ${state.activeFilter === filter ? 'bg-sky-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`;
+                        container.appendChild(button);
+                    });
+                },
+                renderChurchList() {
+                    const listEl = document.getElementById('church-list');
+                    listEl.innerHTML = '';
+                    if(state.filteredChurches.length === 0){
+                        listEl.innerHTML = `<p class="p-4 text-center text-slate-500">Nenhuma igreja encontrada.</p>`;
+                        return;
+                    }
+                    state.filteredChurches.forEach(church => {
+                        const card = document.createElement('div');
+                        card.className = `church-card flex items-start p-4 border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-all border-l-4 border-transparent ${state.selectedChurchId === church.id ? 'selected' : ''}`;
+                        card.dataset.id = church.id;
+                        card.innerHTML = `
+                            <div class="flex-grow">
+                                <h3 class="font-bold text-slate-800">${church.name}</h3>
+                                <p class="text-sm text-slate-600">${church.address || 'Endereço não informado'}</p>
+                                <div class="mt-2 text-xs font-semibold text-white rounded-full px-2 py-0.5 inline-block" style="background-color: ${DENOMINATIONS[church.denomination]?.color || '#71717a'}">
+                                    ${church.denomination || 'Não especificado'}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-center justify-center ml-2">
+                                <button class="edit-btn p-1 text-slate-500 hover:text-sky-600 transition" title="Editar"><i class="fa fa-pencil fa-sm"></i></button>
+                                <button class="delete-btn p-1 text-slate-500 hover:text-red-600 transition" title="Apagar"><i class="fa fa-trash fa-sm"></i></button>
+                            </div>`;
+                        listEl.appendChild(card);
+                    });
+                },
+                renderMarkers() {
+                    state.allMarkers.forEach((marker, churchId) => {
+                        if (!state.allChurches.some(c => c.id === churchId)) {
+                            map.removeLayer(marker);
+                            state.allMarkers.delete(churchId);
+                        }
+                    });
+
+                    state.allChurches.forEach(church => {
+                        if (!church.coords || !Array.isArray(church.coords) || church.coords.length !== 2) return;
+                        
+                        const denomInfo = DENOMINATIONS[church.denomination] || DENOMINATIONS['Outra'];
+                        const icon = L.AwesomeMarkers.icon({
+                            icon: denomInfo.icon,
+                            markerColor: denomInfo.color,
+                            prefix: 'fa'
+                        });
+
+                        if (state.allMarkers.has(church.id)) {
+                            const marker = state.allMarkers.get(church.id);
+                            marker.setLatLng(church.coords);
+                            marker.setIcon(icon);
+                            marker.getPopup().setContent(this.createPopupContent(church));
+                        } else {
+                            const marker = L.marker(church.coords, { icon });
+                            marker.bindPopup(this.createPopupContent(church));
+                            marker.on('click', () => Logic.selectChurch(church.id));
+                            marker.addTo(map);
+                            state.allMarkers.set(church.id, marker);
+                        }
+                    });
+                },
+                createPopupContent(church) {
+                    return `
+                        <div class="p-1">
+                            <h3 class="font-bold text-lg mb-2">${church.name}</h3>
+                            <p class="text-sm">${church.address}</p>
+                            <button class="view-details-btn mt-3 text-sm font-semibold text-sky-600 hover:underline" data-id="${church.id}">Ver detalhes na lista</button>
                         </div>
                     `;
                 },
-                openPanel: () => DOMElements.sidePanel.classList.remove('closed'),
-                closePanel: () => DOMElements.sidePanel.classList.add('closed'),
-                showMessage: (element, message, isError = false) => {
-                    element.textContent = message;
-                    element.className = `mt-1 text-xs h-4 ${isError ? 'text-red-500' : 'text-green-600'}`;
-                },
-                updateChurchCount: () => {
-                    const count = displayedChurches.length;
-                    const total = allChurches.length;
-                    let text = `<i class="fa fa-church text-gray-600 mr-2"></i><strong class="text-gray-900">${count}</strong> de <strong class="text-gray-900">${total}</strong> igreja(s)`;
-                    if (count !== total) {
-                        text += ` (filtrado)`;
-                    }
-                    DOMElements.churchCounter.innerHTML = text;
-                },
-                showModal: (id) => document.getElementById(id)?.classList.replace('hidden', 'flex'),
-                hideModal: (id) => document.getElementById(id)?.classList.replace('flex', 'hidden'),
-                setupConfirmModal: ({ title, message, actionText, actionClass, onConfirm, requiresPassword = false, showCancelButton = true }) => {
-                    document.getElementById('confirm-title').textContent = title;
-                    document.getElementById('confirm-message').innerHTML = message; // Use innerHTML to allow links
-                    const actionBtn = document.getElementById('confirm-action-btn');
-                    actionBtn.textContent = actionText;
-                    actionBtn.className = `px-8 py-2.5 rounded-lg text-white font-semibold transition ${actionClass}`;
-                    
-                    const passwordContainer = document.getElementById('password-field-container');
-                    const passwordInput = document.getElementById('admin-password');
-                    const passwordError = document.getElementById('password-error');
-                    
-                    passwordContainer.classList.toggle('hidden', !requiresPassword);
-                    if (requiresPassword) {
-                        passwordInput.value = '';
-                        passwordError.textContent = '';
-                    }
+                Modal: {
+                    open(isEditing = false) {
+                        state.isEditing = isEditing;
+                        state.currentFormStep = 1;
+                        document.getElementById('modal-title').textContent = isEditing ? 'Editar Igreja' : 'Adicionar Nova Igreja';
+                        this.renderStep();
+                        document.getElementById('church-modal').classList.replace('hidden', 'flex');
+                    },
+                    close() {
+                        document.getElementById('church-modal').classList.replace('flex', 'hidden');
+                        document.getElementById('church-form').innerHTML = '';
+                    },
+                    renderStep() {
+                        const form = document.getElementById('church-form');
+                        const prevBtn = document.getElementById('prev-step-btn');
+                        const nextBtn = document.getElementById('next-step-btn');
+                        const saveBtn = document.getElementById('save-church-btn');
+                        const stepIndicator = document.getElementById('step-indicator');
+                        
+                        let churchData = {};
+                        if(state.isEditing) {
+                            churchData = state.allChurches.find(c => c.id === state.selectedChurchId) || {};
+                        }
 
-                    document.getElementById('cancel-action-btn').style.display = showCancelButton ? 'inline-block' : 'none';
+                        let content = '';
+                        switch(state.currentFormStep) {
+                            case 1: 
+                                content = `<div>
+                                    <label class="font-semibold block mb-2">Passo 1: Localização</label>
+                                    <p class="text-sm text-slate-600 mb-3">Clique no mapa abaixo para definir a localização.</p>
+                                    <div id="modal-map" class="h-64 w-full rounded-lg bg-slate-200 z-0"></div>
+                                    <input type="hidden" id="modal-coords-lat" value="${churchData.coords?.[0] || ''}">
+                                    <input type="hidden" id="modal-coords-lng" value="${churchData.coords?.[1] || ''}">
+                                </div>`;
+                                break;
+                            case 2:
+                                let options = Object.keys(DENOMINATIONS).map(d => `<option value="${d}" ${churchData.denomination === d ? 'selected' : ''}>${d}</option>`).join('');
+                                content = `<div>
+                                    <label class="font-semibold block mb-2">Passo 2: Informações Básicas</label>
+                                    <div class="space-y-4">
+                                        <div><label for="modal-name" class="text-sm">Nome da Igreja*</label><input type="text" id="modal-name" class="w-full border-slate-300 rounded-lg" value="${churchData.name || ''}" required></div>
+                                        <div><label for="modal-denomination" class="text-sm">Denominação*</label><select id="modal-denomination" class="w-full border-slate-300 rounded-lg">${options}</select></div>
+                                        <div><label for="modal-address" class="text-sm">Endereço</label><input type="text" id="modal-address" class="w-full border-slate-300 rounded-lg" value="${churchData.address || ''}"></div>
+                                        <div><label for="modal-neighborhood" class="text-sm">Bairro</label><input type="text" id="modal-neighborhood" class="w-full border-slate-300 rounded-lg" value="${churchData.neighborhood || ''}"></div>
+                                    </div>
+                                </div>`;
+                                break;
+                            case 3:
+                                content = `<div>
+                                    <label class="font-semibold block mb-2">Passo 3: Contato e Redes</label>
+                                    <div class="space-y-4">
+                                        <div><label for="modal-leader" class="text-sm">Líder / Pastor</label><input type="text" id="modal-leader" class="w-full border-slate-300 rounded-lg" value="${churchData.leader || ''}"></div>
+                                        <div><label for="modal-phone" class="text-sm">Telefone</label><input type="tel" id="modal-phone" class="w-full border-slate-300 rounded-lg" value="${churchData.phone || ''}"></div>
+                                        <div><label for="modal-website" class="text-sm">Site / Rede Social (URL)</label><input type="url" id="modal-website" class="w-full border-slate-300 rounded-lg" value="${churchData.website || ''}"></div>
+                                    </div>
+                                </div>`;
+                                break;
+                        }
+                        form.innerHTML = content;
+                        
+                        if(state.currentFormStep === 1) { 
+                            // O Leaflet precisa de um pequeno atraso para renderizar corretamente dentro de um modal que acabou de aparecer
+                            setTimeout(() => this.initModalMap(), 50); 
+                        }
 
-                    actionBtn.onclick = () => {
-                        if (requiresPassword && passwordInput.value !== ADMIN_PASSWORD) {
-                            passwordError.textContent = 'Senha incorreta.';
-                            passwordInput.focus();
+                        prevBtn.classList.toggle('hidden', state.currentFormStep === 1);
+                        nextBtn.classList.toggle('hidden', state.currentFormStep === 3);
+                        saveBtn.classList.toggle('hidden', state.currentFormStep !== 3);
+                        stepIndicator.textContent = `Passo ${state.currentFormStep} de 3`;
+                    },
+                    initModalMap() {
+                        const latInput = document.getElementById('modal-coords-lat');
+                        const lngInput = document.getElementById('modal-coords-lng');
+                        const initialLat = latInput.value;
+                        const initialLng = lngInput.value;
+                        const initialCoords = (initialLat && initialLng) ? [initialLat, initialLng] : MAP_CENTER;
+                        
+                        const mapElement = document.getElementById('modal-map');
+                        if (mapElement._leaflet_id) { // Evita reinicialização
                             return;
                         }
-                        onConfirm();
-                        UI.hideModal('confirm-modal');
-                    };
 
-                    if (showCancelButton) {
-                        document.getElementById('cancel-action-btn').onclick = () => UI.hideModal('confirm-modal');
-                    }
-                    UI.showModal('confirm-modal');
-                },
-                showProgressBar: (label) => {
-                    DOMElements.scanProgressBar.classList.remove('hidden');
-                    DOMElements.scanProgressLabel.textContent = label || 'Processando...';
-                    UI.updateProgressBar(0);
-                },
-                hideProgressBar: () => {
-                    setTimeout(() => DOMElements.scanProgressBar.classList.add('hidden'), 3000);
-                },
-                updateProgressBar: (percentage, label = null) => {
-                    const p = Math.round(percentage);
-                    DOMElements.scanProgressFill.style.width = `${p}%`;
-                    DOMElements.scanProgressText.textContent = `${p}%`;
-                    if (label) DOMElements.scanProgressLabel.textContent = label;
-                },
-            };
-            
-            const MapLogic = {
-                redrawAllMarkers: () => {
-                    churchLayer.clearLayers();
-                    allMarkers = [];
-                    displayedChurches.forEach(church => {
-                        if (church.coords && Array.isArray(church.coords) && church.coords.length === 2) {
-                            const marker = L.marker(church.coords, { icon: churchIcon }).addTo(churchLayer);
-                            marker.bindPopup(MapLogic.createPopupContent(church));
-                            marker.churchId = church.id;
-                            allMarkers.push(marker);
-                        }
-                    });
-                    UI.updateChurchCount();
-                },
-                createPopupContent: (church) => {
-                    let content = `<h3>${church.nome}</h3>`;
-                    if (church.pastor) content += `<p><i class="fa fa-user mr-3 text-gray-400"></i><strong>Líder:</strong>&nbsp; ${church.pastor}</p>`;
-                    if (church.endereco) content += `<p><i class="fa fa-map-marker-alt mr-3 text-gray-400"></i><strong>Endereço:</strong>&nbsp; ${church.endereco}</p>`;
-                    if (church.horarios && church.horarios.length > 0) {
-                        let horariosHtml = "<p><i class='fa fa-clock mr-3 text-gray-400'></i><strong>Horários:</strong></p><ul style='list-style-position: inside; padding-left: 28px; margin-top: -8px;'>";
-                        DIAS_SEMANA.forEach(dia => {
-                            const atividades = church.horarios.filter(h => h.dia === dia);
-                            if (atividades.length > 0) {
-                                horariosHtml += `<li><strong>${dia}:</strong> ${atividades.map(a => `${a.horaInicio}${a.horaFim ? ` - ${a.horaFim}`: ''} (${a.desc})`).join(', ')}</li>`;
-                            }
+                        const modalMap = L.map('modal-map').setView(initialCoords, (initialLat && initialLng) ? 17 : 13);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(modalMap);
+                        let marker = L.marker(initialCoords).addTo(modalMap);
+
+                        modalMap.on('click', (e) => {
+                           latInput.value = e.latlng.lat;
+                           lngInput.value = e.latlng.lng;
+                           if(marker) {
+                               marker.setLatLng(e.latlng);
+                           } else {
+                               marker = L.marker(e.latlng).addTo(modalMap);
+                           }
                         });
-                        content += horariosHtml + "</ul>";
-                    }
-                    if (church.contato) content += `<p><i class="fa fa-phone mr-3 text-gray-400"></i>${church.contato}</p>`;
-                    if (church.whatsapp) content += `<p><i class="fab fa-whatsapp mr-3 text-green-500"></i>${church.whatsapp}</p>`;
-                    if (church.redes_sociais) content += `<p><a href="${church.redes_sociais}" target="_blank" class="text-blue-600 hover:underline"><i class="fa fa-globe mr-3 text-gray-400"></i>Visitar Rede Social</a></p>`;
-                    content += `<div class="mt-4 pt-3 border-t flex space-x-2">
-                        <button class="popup-edit-btn text-sm bg-yellow-400 text-yellow-900 font-semibold py-2 px-4 rounded-lg hover:bg-yellow-500 transition" data-id="${church.id}">Editar</button>
-                        <button class="popup-delete-btn text-sm bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition" data-id="${church.id}" data-name="${church.nome.replace(/"/g, '&quot;')}">Excluir</button>
-                    </div>`;
-                    return content;
-                },
-                setLocationOnMap: (lat, lng, zoom = 18) => {
-                    DOMElements.fields.lat.value = lat.toFixed(6);
-                    DOMElements.fields.lng.value = lng.toFixed(6);
-                    if (tempMarker) map.removeLayer(tempMarker);
-                    const latLng = [lat, lng];
-                    tempMarker = L.marker(latLng, { icon: tempIcon }).addTo(map);
-                    map.setView(latLng, zoom);
-                    DOMElements.coordsInfo.innerHTML = '<i class="fa fa-check-circle text-green-500 mr-2"></i>Localização selecionada no mapa!';
-                },
-                findUserLocation: () => {
-                    if (navigator.geolocation) {
-                        UI.showLoading('Obtendo sua localização...');
-                        navigator.geolocation.getCurrentPosition(
-                            (position) => {
-                                const { latitude, longitude } = position.coords;
-                                map.setView([latitude, longitude], 15);
-                                L.marker([latitude, longitude]).addTo(map).bindPopup("Você está aqui!").openPopup();
-                                UI.hideLoading();
-                            },
-                            () => {
-                                UI.hideLoading();
-                                UI.setupConfirmModal({ title: 'Erro de Localização', message: 'Não foi possível obter sua localização.', actionText: 'OK', actionClass: 'bg-red-600', onConfirm: () => {}, showCancelButton: false });
-                            }
-                        );
-                    }
-                }
-            };
-
-            const FormLogic = {
-                reset: () => {
-                    editingId = null; currentStreet = ''; DOMElements.form.reset(); DOMElements.gmapsUrlInput.value = '';
-                    
-                    DOMElements.horariosContainer.innerHTML = ''; // Limpar horários antigos
-                    FormLogic.setupHorarios(); // Recriar os campos de horário
-                    
-                    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
-                    DOMElements.coordsInfo.innerHTML = '<i class="fa fa-map-pin mr-2 text-blue-500"></i>Clique no mapa ou use o CEP para localizar.';
-                    UI.showMessage(DOMElements.messageArea, ''); UI.showMessage(DOMElements.importMessageArea, ''); UI.showMessage(DOMElements.cepMessageArea, '');
-                    DOMElements.panelTitle.textContent = 'Adicionar Nova Igreja';
-                    DOMElements.saveBtn.textContent = 'Adicionar Igreja';
-                    DOMElements.saveBtn.className = 'w-full bg-blue-600 text-white py-3 px-4 rounded-lg shadow-sm text-base font-medium hover:bg-blue-700 transition';
-                    DOMElements.cancelEditBtn.style.display = 'none';
-                },
-                startEdit: (id) => {
-                    const church = allChurches.find(c => c.id === id); if (!church) return;
-                    FormLogic.reset(); editingId = id;
-                    DOMElements.fields.name.value = church.nome || '';
-                    DOMElements.fields.pastor.value = church.pastor || '';
-                    DOMElements.fields.bairro.value = church.bairro || '';
-                    DOMElements.fields.endereco.value = church.endereco || '';
-                    DOMElements.fields.contato.value = church.contato || '';
-                    DOMElements.fields.whatsapp.value = church.whatsapp || '';
-                    DOMElements.fields.redes.value = church.redes_sociais || '';
-                    if(church.coords) {
-                        DOMElements.fields.lat.value = church.coords[0];
-                        DOMElements.fields.lng.value = church.coords[1];
-                    }
-                    
-                    (church.horarios || []).forEach(h => {
-                        const diaId = h.dia.toLowerCase();
-                        const checkbox = document.getElementById(`check-${diaId}`);
-                        if(checkbox) {
-                            checkbox.checked = true;
-                            const fieldsDiv = document.getElementById(`fields-${diaId}`);
-                            fieldsDiv.classList.add('active');
-                            fieldsDiv.querySelector(`#hora-inicio-${diaId}`).value = h.horaInicio || '';
-                            fieldsDiv.querySelector(`#hora-fim-${diaId}`).value = h.horaFim || '';
-                            fieldsDiv.querySelector(`#desc-${diaId}`).value = h.desc || '';
-                        }
-                    });
-                    DOMElements.panelTitle.textContent = 'Editar Igreja';
-                    DOMElements.saveBtn.textContent = 'Salvar Alterações';
-                    DOMElements.saveBtn.className = 'w-full bg-yellow-500 text-white py-3 px-4 rounded-lg shadow-sm text-base font-medium hover:bg-yellow-600 transition';
-                    DOMElements.cancelEditBtn.style.display = 'block'; map.closePopup(); UI.openPanel();
-                },
-                save: async () => {
-                    if (!DOMElements.fields.name.value || !DOMElements.fields.lat.value || !DOMElements.fields.lng.value) { UI.showMessage(DOMElements.messageArea, 'Nome e localização são obrigatórios.', true); return; }
-                    const horarios = [];
-                    DIAS_SEMANA.forEach(dia => {
-                        const diaId = dia.toLowerCase();
-                        if(document.getElementById(`check-${diaId}`).checked) {
-                            horarios.push({ dia: dia, horaInicio: document.getElementById(`hora-inicio-${diaId}`).value, horaFim: document.getElementById(`hora-fim-${diaId}`).value, desc: document.getElementById(`desc-${diaId}`).value });
-                        }
-                    });
-                    const churchData = {
-                        nome: DOMElements.fields.name.value,
-                        pastor: DOMElements.fields.pastor.value,
-                        bairro: DOMElements.fields.bairro.value,
-                        endereco: DOMElements.fields.endereco.value,
-                        horarios: horarios,
-                        contato: DOMElements.fields.contato.value,
-                        whatsapp: DOMElements.fields.whatsapp.value,
-                        redes_sociais: DOMElements.fields.redes.value,
-                        coords: [parseFloat(DOMElements.fields.lat.value), parseFloat(DOMElements.fields.lng.value)]
-                    };
-                    DOMElements.saveBtn.textContent = 'Salvando...'; DOMElements.saveBtn.disabled = true;
-                    try {
-                        if (editingId) {
-                            await setDoc(doc(igrejasCollectionRef, editingId), churchData);
-                        } else {
-                            await addDoc(igrejasCollectionRef, churchData);
-                        }
-                        FormLogic.reset(); UI.closePanel();
-                    } catch (error) { console.error("Erro ao salvar:", error); UI.showMessage(DOMElements.messageArea, 'Erro ao salvar.', true); }
-                    finally { DOMElements.saveBtn.disabled = false; }
-                },
-                setupHorarios: () => {
-                    const timeOptions = (() => {
-                        let opts = '<option value="">--:--</option>';
-                        for (let h = 0; h < 24; h++) {
-                            for (let m = 0; m < 60; m += 30) {
-                                const t = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                                opts += `<option value="${t}">${t}</option>`;
-                            }
-                        }
-                        return opts;
-                    })();
-                    DIAS_SEMANA.forEach(dia => {
-                        const diaId = dia.toLowerCase();
-                        const dayDiv = document.createElement('div');
-                        dayDiv.className = 'bg-white border border-gray-200 p-3 rounded-lg';
-                        dayDiv.innerHTML = `
-                            <label class="flex items-center cursor-pointer">
-                                <input type="checkbox" id="check-${diaId}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                <span class="ml-3 text-sm font-medium text-gray-800">${dia}</span>
-                            </label>
-                            <div class="schedule-day-fields mt-3 space-y-2 pl-7" id="fields-${diaId}">
-                                <input type="text" id="desc-${diaId}" placeholder="Descrição (Ex: Culto, Missa)" class="block w-full border-gray-300 rounded-lg shadow-sm sm:text-sm">
-                                <div class="flex items-center space-x-2 text-sm">
-                                    <select id="hora-inicio-${diaId}" class="block w-full rounded-lg">${timeOptions}</select>
-                                    <span class="text-gray-500">até</span>
-                                    <select id="hora-fim-${diaId}" class="block w-full rounded-lg">${timeOptions}</select>
-                                </div>
-                            </div>`;
-                        DOMElements.horariosContainer.appendChild(dayDiv);
-                        const checkbox = dayDiv.querySelector(`#check-${diaId}`);
-                        const fieldsDiv = dayDiv.querySelector(`#fields-${diaId}`);
-                        checkbox.addEventListener('change', () => { fieldsDiv.classList.toggle('active', checkbox.checked); });
-                    });
-                }
-            };
-            
-            const API = {
-                fetchAddressForCoords: async (lat, lon) => {
-                    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&addressdetails=1&zoom=18`;
-                    try {
-                        const response = await fetch(url);
-                        const data = await response.json();
-                        if (data && data.address) {
-                            const addr = data.address;
-                            const rua = addr.road || '';
-                            const numero = addr.house_number || '';
-                            const bairro = addr.suburb || addr.city_district || '';
-                            let nomePOI = '';
-
-                            // O nome do POI é frequentemente a primeira parte do display_name
-                            if (data.display_name) {
-                                const firstPart = data.display_name.split(',')[0];
-                                if (isNaN(parseInt(firstPart))) { // Garante que não é apenas um número de casa
-                                    nomePOI = firstPart;
-                                }
-                            }
-                            
-                            // Como fallback, verificar tags comuns de POI no objeto de endereço
-                            if (!nomePOI) {
-                                 nomePOI = addr.amenity || addr.shop || addr.building || addr.tourism || addr.leisure || '';
-                            }
-
-                            return {
-                                nome: nomePOI,
-                                endereco: numero ? `${rua}, ${numero}` : rua,
-                                bairro: bairro,
-                                rua: rua,
-                                numero: numero
-                            };
-                        }
-                    } catch (error) {
-                        console.error("Erro no reverse geocode:", error);
-                    }
-                    return { nome: '', endereco: '', bairro: '', rua: '', numero: '' };
-                },
-                searchAddress: async (query) => {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Blumenau')}&addressdetails=1&limit=5`;
-                    try {
-                        const response = await fetch(url);
-                        if (!response.ok) return null;
-                        const data = await response.json();
-                        if (data && data.length > 0) {
-                            const blumenauBounds = { minLat: -27.05, maxLat: -26.75, minLon: -49.25, maxLon: -49.00 };
-                            return data.filter(r => r.lat > blumenauBounds.minLat && r.lat < blumenauBounds.maxLat && r.lon > blumenauBounds.minLon && r.lon < blumenauBounds.maxLon);
-                        }
-                        return null;
-                    } catch (error) { console.error("Erro na busca de endereço:", error); return null; }
-                },
-                fetchCEP: async (cep) => {
-                    UI.showMessage(DOMElements.cepMessageArea, 'Buscando CEP...');
-                    try {
-                        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-                        const data = await response.json();
-                        if (data.erro) {
-                            UI.showMessage(DOMElements.cepMessageArea, 'CEP não encontrado.', true);
-                            currentStreet = '';
-                        } else {
-                            currentStreet = data.logradouro || '';
-                            DOMElements.fields.endereco.value = currentStreet;
-                            DOMElements.fields.bairro.value = data.bairro || '';
-                            DOMElements.fields.numero.value = '';
-                            DOMElements.fields.numero.focus();
-                            UI.showMessage(DOMElements.cepMessageArea, 'CEP encontrado!');
-                            API.geocodeAddress(`${currentStreet}, ${data.bairro}, Blumenau`);
-                        }
-                    } catch {
-                        UI.showMessage(DOMElements.cepMessageArea, 'Erro ao buscar CEP.', true);
-                        currentStreet = '';
-                    }
-                },
-                geocodeAddress: async (address) => {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
-                    try {
-                        const response = await fetch(url);
-                        const data = await response.json();
-                        if (data && data.length > 0) {
-                            const { lat, lon } = data[0];
-                            MapLogic.setLocationOnMap(parseFloat(lat), parseFloat(lon));
-                        }
-                    } catch (error) { console.error("Erro no geocode:", error); }
-                },
-                reverseGeocode: async (lat, lon) => {
-                    const addrDetails = await API.fetchAddressForCoords(lat, lon);
-                    DOMElements.fields.bairro.value = addrDetails.bairro;
-                    currentStreet = addrDetails.rua;
-                    DOMElements.fields.numero.value = addrDetails.numero;
-                    DOMElements.fields.endereco.value = addrDetails.endereco;
-                }
-            };
-
-            const Admin = {
-                testDbConnection: async () => {
-                    UI.showLoading('Testando ligação...');
-                    try {
-                        // Tenta ler um único documento para testar a permissão de leitura.
-                        const testQuery = query(igrejasCollectionRef, limit(1));
-                        await getDocs(testQuery);
-
-                        UI.hideLoading();
-                        UI.setupConfirmModal({
-                            title: 'Ligação Bem-sucedida!',
-                            message: 'A aplicação conseguiu ligar-se e ler os dados da sua base de dados Firebase com sucesso.',
-                            actionText: 'OK',
-                            actionClass: 'bg-green-600 hover:bg-green-700',
-                            onConfirm: () => {},
-                            showCancelButton: false
-                        });
-
-                    } catch (error) {
-                        console.error("Teste de ligação falhou:", error);
-                        UI.hideLoading();
-                        const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
-                        if (error.code === 'permission-denied') {
-                             UI.setupConfirmModal({
-                                title: 'Falha na Ligação (Erro de Permissão)',
-                                message: `O teste falhou. A sua base de dados está a bloquear o acesso. Por favor, siga os passos na mensagem de erro principal para corrigir as 'Regras' no seu painel Firebase. <a href="${rulesUrl}" target="_blank" class="text-blue-600 underline font-bold">Clique aqui para ir para a página de Regras.</a>`,
-                                actionText: 'Entendido',
-                                actionClass: 'bg-red-600 hover:bg-red-700',
-                                onConfirm: () => {},
-                                showCancelButton: false
-                            });
-                        } else {
-                             UI.setupConfirmModal({
-                                title: 'Falha na Ligação',
-                                message: `Não foi possível ligar ao Firebase. Verifique a sua ligação à internet e a configuração do Firebase no ficheiro HTML. Erro: ${error.message}`,
-                                actionText: 'OK',
-                                actionClass: 'bg-red-600 hover:bg-red-700',
-                                onConfirm: () => {},
-                                showCancelButton: false
-                            });
+                    },
+                    getFormData() {
+                        const form = document.getElementById('church-form');
+                        const lat = form.querySelector('#modal-coords-lat')?.value;
+                        const lng = form.querySelector('#modal-coords-lng')?.value;
+                        return {
+                            name: form.querySelector('#modal-name')?.value,
+                            denomination: form.querySelector('#modal-denomination')?.value,
+                            address: form.querySelector('#modal-address')?.value,
+                            neighborhood: form.querySelector('#modal-neighborhood')?.value,
+                            leader: form.querySelector('#modal-leader')?.value,
+                            phone: form.querySelector('#modal-phone')?.value,
+                            website: form.querySelector('#modal-website')?.value,
+                            coords: (lat && lng) ? [parseFloat(lat), parseFloat(lng)] : null,
                         }
                     }
                 },
-                confirmDelete: (id, name) => {
-                    UI.setupConfirmModal({
-                        title: 'Confirmar Exclusão',
-                        message: `Tem certeza que deseja excluir a igreja "${name}"? Esta ação não pode ser desfeita.`,
-                        actionText: 'Excluir',
-                        actionClass: 'bg-red-600 hover:bg-red-700',
-                        onConfirm: () => Admin.deleteChurch(id),
-                        requiresPassword: true
-                    });
-                },
-                deleteChurch: async (id) => {
-                    try {
-                        await deleteDoc(doc(igrejasCollectionRef, id));
-                    } catch (error) {
-                        console.error("Erro ao excluir:", error);
-                    }
-                },
-                confirmClearMap: () => {
-                    UI.setupConfirmModal({
-                        title: 'Limpar o Mapa',
-                        message: `ATENÇÃO: Isso apagará TODAS as igrejas do mapa. Esta ação é irreversível. Digite a senha para confirmar.`,
-                        actionText: 'Apagar Tudo',
-                        actionClass: 'bg-red-700 hover:bg-red-800',
-                        onConfirm: Admin.clearAllChurches,
-                        requiresPassword: true
-                    });
-                },
-                clearAllChurches: async () => {
-                    UI.showLoading('Apagando todas as igrejas...');
-                    const batch = writeBatch(db);
-                    allChurches.forEach(church => {
-                        batch.delete(doc(igrejasCollectionRef, church.id));
-                    });
-                    try {
-                        await batch.commit();
-                        UI.hideLoading();
-                    } catch (error) {
-                        console.error("Erro ao limpar o mapa:", error);
-                        UI.hideLoading();
-                    }
-                },
-                confirmScanMap: () => {
-                     UI.setupConfirmModal({
-                        title: 'Escanear Mapa',
-                        message: `Isso irá procurar por "igreja" em todo o mapa de Blumenau. Pode demorar vários minutos e consumir muitos recursos. Deseja continuar?`,
-                        actionText: 'Escanear',
-                        actionClass: 'bg-blue-600 hover:bg-blue-700',
-                        onConfirm: Admin.scanMapForChurches,
-                        requiresPassword: true
-                    });
-                },
-                scanMapForChurches: async () => {
-                    UI.hideModal('church-list-modal');
-                    UI.hideModal('confirm-modal');
-                    UI.showProgressBar('Iniciando escaneamento...');
+                Confirmation: {
+                    show({ title, message, actionText, onConfirm }) {
+                        const modal = document.getElementById('confirm-modal');
+                        modal.querySelector('#confirm-title').textContent = title;
+                        modal.querySelector('#confirm-message').innerHTML = message;
+                        const actionBtn = modal.querySelector('#confirm-action-btn');
+                        actionBtn.textContent = actionText;
 
-                    const bounds = { minLon: -49.25, minLat: -27.05, maxLon: -49.00, maxLat: -26.75 };
-                    const query = 'igreja';
-                    const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=jsonv2&viewbox=${bounds.minLon},${bounds.maxLat},${bounds.maxLon},${bounds.minLat}&bounded=1&limit=100`;
+                        modal.classList.replace('hidden', 'flex');
 
-                    try {
-                        const response = await fetch(url);
-                        if (!response.ok) throw new Error('Falha na resposta da rede');
-                        const results = await response.json();
-
-                        if (results.length === 0) {
-                            UI.updateProgressBar(100, 'Nenhuma nova igreja encontrada.');
-                            UI.hideProgressBar();
-                            return;
-                        }
-
-                        const newChurches = [];
-                        for (const result of results) {
-                            const lat = parseFloat(result.lat);
-                            const lon = parseFloat(result.lon);
-                            const name = result.display_name.split(',')[0];
-
-                            const isDuplicate = allChurches.some(church => {
-                                const distance = Math.sqrt(Math.pow(church.coords[0] - lat, 2) + Math.pow(church.coords[1] - lon, 2));
-                                return distance < 0.0002;
-                            });
-
-                            if (!isDuplicate) newChurches.push({ lat, lon, nome: name });
-                        }
-
-                        if (newChurches.length === 0) {
-                            UI.updateProgressBar(100, 'Nenhuma igreja nova encontrada.');
-                            UI.hideProgressBar();
-                            return;
-                        }
+                        const newActionBtn = actionBtn.cloneNode(true);
+                        actionBtn.parentNode.replaceChild(newActionBtn, actionBtn);
                         
-                        let addedCount = 0;
-                        for (let i = 0; i < newChurches.length; i++) {
-                            const newChurch = newChurches[i];
-                            const progress = ((i + 1) / newChurches.length) * 100;
-                            UI.updateProgressBar(progress, `Adicionando: ${newChurch.nome}`);
-                            const addrDetails = await API.fetchAddressForCoords(newChurch.lat, newChurch.lon);
-                            const churchData = {
-                                nome: newChurch.nome, pastor: '', bairro: addrDetails.bairro || '', endereco: addrDetails.endereco || '',
-                                horarios: [], contato: '', whatsapp: '', redes_sociais: '', coords: [newChurch.lat, newChurch.lon]
-                            };
-                            await addDoc(igrejasCollectionRef, churchData);
-                            addedCount++;
-                        }
-                        UI.updateProgressBar(100, `${addedCount} nova(s) igreja(s) adicionada(s)!`);
-                    } catch (error) {
-                        console.error("Erro durante o escaneamento:", error);
-                        UI.updateProgressBar(100, 'Ocorreu um erro.');
-                    } finally {
-                        UI.hideProgressBar();
-                    }
-                },
-                findAndAddChurchFromMap: async (lat, lng) => {
-                    UI.showLoading('Identificando local...');
-                    try {
-                        FormLogic.reset();
-                        MapLogic.setLocationOnMap(lat, lng);
-                        const addrDetails = await API.fetchAddressForCoords(lat, lng);
-                        
-                        DOMElements.fields.bairro.value = addrDetails.bairro || '';
-                        DOMElements.fields.endereco.value = addrDetails.endereco || '';
-                        DOMElements.fields.numero.value = addrDetails.numero || ''; // Preencher o campo número
-                        
-                        // Preencher o nome se encontrado, senão usar placeholder
-                        if (addrDetails.nome) {
-                            DOMElements.fields.name.value = addrDetails.nome;
-                        } else {
-                             DOMElements.fields.name.placeholder = `Igreja em ${addrDetails.rua || 'local desconhecido'}`;
-                        }
-                        
-                        UI.openPanel();
-                        // Focar no próximo campo se o nome já foi preenchido
-                        if (addrDetails.nome) {
-                            DOMElements.fields.pastor.focus();
-                        } else {
-                            DOMElements.fields.name.focus();
-                        }
-
-                    } catch (error) {
-                        console.error("Erro no modo inspeção:", error);
-                    } finally {
-                        UI.hideLoading();
-                        isInspectMode = false;
-                        DOMElements.inspectModeBtn.classList.remove('active');
-                        document.body.classList.remove('inspect-mode-active');
-                    }
-                }
-            };
-
-            const debounce = (func, delay) => {
-                let timeout;
-                return function(...args) {
-                    const context = this;
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(context, args), delay);
-                };
-            };
-
-            const handleSearch = async (query) => {
-                if (!query) {
-                    displayedChurches = [...allChurches];
-                    MapLogic.redrawAllMarkers();
-                    DOMElements.searchResultsContainer.classList.add('hidden');
-                    DOMElements.clearSearchBtn.classList.add('hidden');
-                    return;
-                }
-
-                DOMElements.clearSearchBtn.classList.remove('hidden');
-
-                const churchResults = allChurches.filter(church =>
-                    church.nome.toLowerCase().includes(query) ||
-                    (church.bairro && church.bairro.toLowerCase().includes(query))
-                );
-
-                const addressResults = await API.searchAddress(query);
-                renderSearchResults(churchResults, addressResults);
-
-                displayedChurches = churchResults;
-                MapLogic.redrawAllMarkers();
-            };
-
-            const renderSearchResults = (churches, addresses) => {
-                const container = DOMElements.searchResultsContainer;
-                container.innerHTML = '';
-
-                if (churches.length === 0 && (!addresses || addresses.length === 0)) {
-                    container.innerHTML = '<div class="p-4 text-sm text-gray-500">Nenhum resultado encontrado.</div>';
-                    container.classList.remove('hidden');
-                    return;
-                }
-
-                if (churches.length > 0) {
-                    container.innerHTML += '<h4 class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500 uppercase">Igrejas</h4>';
-                    churches.forEach(church => {
-                        const div = document.createElement('div');
-                        div.className = 'p-4 hover:bg-gray-100 cursor-pointer';
-                        div.innerHTML = `<p class="font-semibold text-gray-800">${church.nome}</p><p class="text-sm text-gray-600">${church.bairro || 'Localização não especificada'}</p>`;
-                        div.onclick = () => {
-                            const marker = allMarkers.find(m => m.churchId === church.id);
-                            if (marker) {
-                                map.setView(marker.getLatLng(), 18);
-                                marker.openPopup();
-                            }
-                            container.classList.add('hidden');
+                        newActionBtn.onclick = () => {
+                            onConfirm();
+                            this.hide();
                         };
-                        container.appendChild(div);
-                    });
+
+                        modal.querySelector('#confirm-cancel-btn').onclick = () => this.hide();
+                    },
+                    hide() {
+                        document.getElementById('confirm-modal').classList.replace('flex', 'hidden');
+                    }
                 }
-                
-                if (addresses && addresses.length > 0) {
-                    container.innerHTML += '<h4 class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500 uppercase">Endereços</h4>';
-                    addresses.forEach(addr => {
-                        const div = document.createElement('div');
-                        div.className = 'p-4 hover:bg-gray-100 cursor-pointer';
-                        div.innerHTML = `<p class="font-semibold text-gray-800">${addr.display_name.split(',')[0]}</p><p class="text-sm text-gray-600">${addr.display_name.split(',').slice(1).join(',')}</p>`;
-                        div.onclick = () => {
-                            showAddressOnMap(addr);
-                            container.classList.add('hidden');
-                        };
-                        container.appendChild(div);
-                    });
-                }
-                
-                container.classList.remove('hidden');
             };
 
-            const showAddressOnMap = (address) => {
-                const lat = parseFloat(address.lat);
-                const lon = parseFloat(address.lon);
-                map.setView([lat, lon], 17);
-                if(tempMarker) map.removeLayer(tempMarker);
-                tempMarker = L.marker([lat, lon], {icon: tempIcon}).addTo(map);
-            };
+            // --- CONFIGURAÇÃO DOS EVENT LISTENERS ---
+            function setupEventListeners() {
+                document.getElementById('filter-container').addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON') {
+                        state.activeFilter = e.target.dataset.filter;
+                        Logic.applyFilters();
+                        UI.renderFilterButtons();
+                        UI.renderChurchList();
+                    }
+                });
 
-            function initializeEventListeners() {
-                // Painel Lateral
-                DOMElements.togglePanelBtn.addEventListener('click', () => { FormLogic.reset(); UI.openPanel(); });
-                DOMElements.closePanelBtn.addEventListener('click', () => { FormLogic.reset(); UI.closePanel(); });
-                DOMElements.saveBtn.addEventListener('click', FormLogic.save);
-                DOMElements.cancelEditBtn.addEventListener('click', FormLogic.reset);
+                document.getElementById('search-input').addEventListener('input', (e) => {
+                    Logic.applyFilters(e.target.value.toLowerCase());
+                    UI.renderChurchList();
+                });
 
-                // Mapa
-                map.on('click', (e) => {
-                    if (isInspectMode) { Admin.findAndAddChurchFromMap(e.latlng.lat, e.latlng.lng); } 
-                    else { if (editingId) return; MapLogic.setLocationOnMap(e.latlng.lat, e.latlng.lng); API.reverseGeocode(e.latlng.lat, e.latlng.lng); }
+                document.getElementById('church-list').addEventListener('click', (e) => {
+                    const card = e.target.closest('.church-card');
+                    if (!card) return;
+                    const churchId = card.dataset.id;
+                    if (e.target.closest('.edit-btn')) {
+                        Logic.selectChurch(churchId);
+                        UI.Modal.open(true);
+                    } else if (e.target.closest('.delete-btn')) {
+                        Logic.confirmDelete(churchId);
+                    } else {
+                        Logic.selectChurch(churchId);
+                    }
                 });
                 
-                // Popups
                 map.on('popupopen', (e) => {
-                    const popupNode = e.popup.getElement();
-                    popupNode.querySelector('.popup-edit-btn')?.addEventListener('click', (ev) => FormLogic.startEdit(ev.target.dataset.id));
-                    popupNode.querySelector('.popup-delete-btn')?.addEventListener('click', (ev) => Admin.confirmDelete(ev.target.dataset.id, ev.target.dataset.name));
-                });
-
-                // CEP e Endereço
-                let cepTimeout;
-                DOMElements.fields.cep.addEventListener('input', function() {
-                    clearTimeout(cepTimeout);
-                    const cep = this.value.replace(/\D/g, '');
-                    if (cep.length === 8) {
-                        cepTimeout = setTimeout(() => API.fetchCEP(cep), 500);
-                    } else {
-                        UI.showMessage(DOMElements.cepMessageArea, '');
-                    }
-                });
-                DOMElements.fields.numero.addEventListener('input', function() {
-                    const numero = this.value.trim();
-                    if (currentStreet) {
-                        DOMElements.fields.endereco.value = numero ? `${currentStreet}, ${numero}` : currentStreet;
-                    }
-                });
-
-                // Importar
-                document.getElementById('import-gmaps-btn').addEventListener('click', () => {
-                    const url = DOMElements.gmapsUrlInput.value;
-                    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-                    const match = url.match(regex);
-                    if (match) {
-                        const [lat, lng] = [parseFloat(match[1]), parseFloat(match[2])];
-                        MapLogic.setLocationOnMap(lat, lng);
-                        API.reverseGeocode(lat, lng);
-                        UI.showMessage(DOMElements.importMessageArea, 'Coordenadas importadas!');
-                    } else {
-                        UI.showMessage(DOMElements.importMessageArea, 'URL inválida.', true);
-                    }
-                });
-
-                // Modais e Listas
-                DOMElements.churchCounter.addEventListener('click', () => {
-                    const contentDiv = DOMElements.churchListContent;
-                    contentDiv.innerHTML = '';
-                    const grouped = allChurches.reduce((acc, church) => {
-                        const bairro = church.bairro || 'Sem Bairro';
-                        if (!acc[bairro]) acc[bairro] = [];
-                        acc[bairro].push(church);
-                        return acc;
-                    }, {});
-                    Object.keys(grouped).sort().forEach(bairro => {
-                        contentDiv.insertAdjacentHTML('beforeend', `<h4 class="text-xl font-bold text-blue-800 mt-5 first:mt-0 mb-3 border-b-2 border-blue-200 pb-2">${bairro}</h4>`);
-                        const list = document.createElement('ul');
-                        list.className = 'space-y-2';
-                        grouped[bairro].sort((a,b) => a.nome.localeCompare(b.nome)).forEach(church => {
-                            const li = document.createElement('li');
-                            li.className = 'p-3 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-800';
-                            li.textContent = church.nome;
-                            li.onclick = () => {
-                                const marker = allMarkers.find(m => m.churchId === church.id);
-                                if (marker) {
-                                    map.setView(marker.getLatLng(), 18);
-                                    marker.openPopup();
-                                }
-                                UI.hideModal('church-list-modal');
-                            };
-                            list.appendChild(li);
-                        });
-                        contentDiv.appendChild(list);
+                    e.popup.getElement().querySelector('.view-details-btn')?.addEventListener('click', (ev) => {
+                        Logic.selectChurch(ev.target.dataset.id);
                     });
-                    UI.showModal('church-list-modal');
                 });
-                document.querySelectorAll('.modal-close-btn').forEach(btn => btn.addEventListener('click', () => UI.hideModal(btn.closest('.fixed').id)));
                 
-                // Funções Admin
-                document.getElementById('clear-map-btn').addEventListener('click', Admin.confirmClearMap);
-                document.getElementById('scan-map-btn').addEventListener('click', Admin.confirmScanMap);
-                document.getElementById('test-db-connection-btn').addEventListener('click', Admin.testDbConnection);
-
-                DOMElements.inspectModeBtn.addEventListener('click', () => {
-                    isInspectMode = !isInspectMode;
-                    DOMElements.inspectModeBtn.classList.toggle('active', isInspectMode);
-                    document.body.classList.toggle('inspect-mode-active', isInspectMode);
-                    if (isInspectMode) {
-                        UI.setupConfirmModal({ title: 'Modo Inspeção Ativado', message: 'Clique em um ícone de cruz no mapa para adicionar uma igreja.', actionText: 'Entendi!', actionClass: 'bg-blue-600', onConfirm: () => {}, showCancelButton: false });
-                    }
+                document.getElementById('add-church-btn').addEventListener('click', () => UI.Modal.open(false));
+                document.getElementById('close-modal-btn').addEventListener('click', () => UI.Modal.close());
+                document.getElementById('prev-step-btn').addEventListener('click', () => {
+                    if(state.currentFormStep > 1) { state.currentFormStep--; UI.Modal.renderStep(); }
                 });
-
-                // Pesquisa
-                const debouncedSearch = debounce((e) => handleSearch(e.target.value.toLowerCase().trim()), 300);
-                DOMElements.searchInput.addEventListener('input', debouncedSearch);
-                DOMElements.clearSearchBtn.addEventListener('click', () => {
-                    DOMElements.searchInput.value = '';
-                    DOMElements.clearSearchBtn.classList.add('hidden');
-                    DOMElements.searchResultsContainer.classList.add('hidden');
-                    displayedChurches = [...allChurches];
-                    MapLogic.redrawAllMarkers();
+                document.getElementById('next-step-btn').addEventListener('click', () => {
+                     if(state.currentFormStep < 3) { state.currentFormStep++; UI.Modal.renderStep(); }
                 });
-                document.addEventListener('click', (e) => {
-                    if (!DOMElements.searchInput.closest('.relative').contains(e.target)) {
-                        DOMElements.searchResultsContainer.classList.add('hidden');
-                    }
-                });
-
-                // Geolocalização
-                document.getElementById('user-location-btn').addEventListener('click', MapLogic.findUserLocation);
-            }
-            
-            function initializeAppAndMap() {
-                try {
-                    const firebaseConfig = typeof __firebase_config !== 'undefined'
-                        ? JSON.parse(__firebase_config)
-                        : USER_FIREBASE_CONFIG;
-                    
-                    if (!firebaseConfig || !firebaseConfig.apiKey) {
-                         throw new Error("Configuração do Firebase não encontrada ou não preenchida. Edite o arquivo HTML.");
-                    }
-
-                    app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
-                    // CORREÇÃO: O caminho da coleção deve corresponder às regras de segurança.
-                    igrejasCollectionRef = collection(db, "igrejas");
-                    
-                    map = L.map('map-container', { zoomControl: false }).setView(MAP_CENTER, INITIAL_ZOOM);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-                        maxZoom: 19, 
-                        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' 
-                    }).addTo(map);
-                    L.control.zoom({ position: 'bottomright' }).addTo(map);
-                    churchLayer = L.layerGroup().addTo(map);
-                    
-                    startApp();
-
-                } catch (error) {
-                    console.error("ERRO CRÍTICO DE INICIALIZAÇÃO:", error);
-                    UI.showError(
-                        "Falha na Inicialização", 
-                        "Verifique se você colou corretamente a configuração do seu projeto Firebase no arquivo HTML."
-                    );
-                }
+                document.getElementById('save-church-btn').addEventListener('click', Logic.saveChurch);
             }
 
-            function startApp() {
-                FormLogic.setupHorarios();
-                initializeEventListeners();
-                main();
-            }
-
-            async function main() {
-                UI.showLoading('Autenticando...');
-                try {
-                    const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                    if (authToken) {
-                        await signInWithCustomToken(auth, authToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (error) {
-                    console.error("Erro na autenticação:", error);
-                    DOMElements.churchCounter.innerHTML = `<strong class="text-red-500">FALHA NA AUTENTICAÇÃO</strong>`;
-                    UI.hideLoading();
-                    const authUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/authentication/settings`;
-                    UI.showError(
-                        "Erro de Autenticação",
-                        `Verifique se o seu domínio está autorizado no Firebase. <a href="${authUrl}" target="_blank" class="text-blue-600 underline font-bold">Clique aqui para abrir as configurações de autenticação</a> e adicione o seu domínio.`
-                    );
-                    return;
-                }
-
-                UI.showLoading('A carregar dados das igrejas...');
-                onSnapshot(igrejasCollectionRef, (snapshot) => {
-                    allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    if (DOMElements.searchInput.value.trim() === '') {
-                        displayedChurches = [...allChurches];
-                    }
-                    MapLogic.redrawAllMarkers();
-                    UI.hideLoading();
-                }, (error) => {
-                    console.error("Erro ao buscar dados: ", error);
-                    DOMElements.churchCounter.innerHTML = `<strong class="text-red-500">ERRO AO CARREGAR DADOS</strong>`;
-                    UI.hideLoading();
-                    const rulesUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/firestore/rules`;
-                    UI.showError(
-                        "Erro de Permissão no Firebase",
-                        `A sua base de dados bloqueou o acesso. <b>A correção é feita no site do Firebase.</b><br/><br/>
-                         1. <a href="${rulesUrl}" target="_blank" class="text-blue-600 underline font-bold">Clique aqui para abrir a página de Regras do seu projeto.</a><br/>
-                         2. Apague todo o texto que está lá e cole o seguinte:<br/>
-                         <code class="bg-gray-200 p-1 rounded text-xs block text-left my-2" style="white-space: pre-wrap;">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /igrejas/{document=**} {
-      allow read, write: if true;
-    }
-  }
-}</code>
-                         3. Clique no botão 'Publicar' e recarregue esta página.`
-                    );
-                });
-            }
-            
-            // Iniciar a aplicação
-            initializeAppAndMap();
+            // --- PONTO DE ENTRADA ---
+            initializeApp();
         });
     </script>
 </body>
