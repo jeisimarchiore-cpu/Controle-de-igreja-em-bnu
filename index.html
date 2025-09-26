@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Igrejas - Blumenau</title>
+    <title>Portal de Igrejas - Vale do Itajaí</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -34,6 +34,8 @@
             #side-panel { transition: transform 0.3s ease-in-out; }
             #side-panel.hidden-mobile { transform: translateX(-100%); }
         }
+        /* Ajuste para o mapa dentro do modal do Leaflet */
+        .leaflet-container { z-index: 0; }
     </style>
 </head>
 <body class="h-full bg-slate-50 antialiased overflow-hidden text-slate-800">
@@ -47,7 +49,7 @@
                     <i class="fa fa-church text-2xl text-sky-600"></i>
                     <div>
                         <h1 class="text-lg font-bold text-slate-900">Portal de Igrejas</h1>
-                        <p class="text-xs text-slate-500">Encontre um lugar de comunidade em Blumenau</p>
+                        <p class="text-xs text-slate-500">Encontre um lugar de comunidade no Vale do Itajaí</p>
                     </div>
                 </div>
             </header>
@@ -57,9 +59,10 @@
                     <i class="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
                     <input type="text" id="search-input" placeholder="Pesquisar por nome..." class="w-full bg-slate-100 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
                 </div>
-                <div class="flex gap-2">
-                    <select id="denomination-filter" class="w-1/2 bg-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"></select>
-                    <select id="neighborhood-filter" class="w-1/2 bg-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"></select>
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="city-filter" class="col-span-2 bg-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"></select>
+                    <select id="denomination-filter" class="w-full bg-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"></select>
+                    <select id="neighborhood-filter" class="w-full bg-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"></select>
                 </div>
             </div>
 
@@ -83,10 +86,23 @@
         </button>
     </div>
     
-    <!-- MODAIS -->
-    <div id="modal-container"></div>
+    <!-- MODAIS E OUTROS ELEMENTOS FLUTUANTES -->
+    <div id="floating-elements-container">
+        <div id="modal-container"></div>
+
+        <!-- BARRA DE PROGRESSO PARA IMPORTAÇÃO -->
+        <div id="import-progress-bar" class="fixed bottom-4 right-4 z-50 bg-white p-3 rounded-lg shadow-lg w-full max-w-sm hidden transition-opacity duration-300 fade-in">
+            <div class="flex justify-between items-center mb-1">
+                <span id="import-progress-label" class="text-sm font-semibold text-slate-700">A importar...</span>
+                <span id="import-progress-text" class="text-sm font-medium text-slate-600">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2">
+                <div id="import-progress-fill" class="bg-sky-600 h-2 rounded-full transition-all duration-300 ease-linear" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
     
-    <!-- OVERLAY DE CARREGAMENTO -->
+    <!-- OVERLAY DE CARREGAMENTO INICIAL -->
     <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
         <i class="fa fa-church fa-spin text-5xl text-sky-600"></i>
         <p id="loading-text" class="mt-4 text-slate-700 font-semibold">A carregar o portal...</p>
@@ -110,10 +126,40 @@
             };
             
             const ADMIN_PASSWORD = "2308";
-            const MAP_CENTER = [-26.9194, -49.0661];
+            const MAP_CENTER = [-26.9194, -49.0661]; // Centro do Vale (Blumenau)
+            const CIDADES_VALE_ITAJAI = {
+                "Blumenau": { lat: -26.9194, lon: -49.0661, zoom: 12 },
+                "Itajaí": { lat: -26.9075, lon: -48.6619, zoom: 13 },
+                "Balneário Camboriú": { lat: -26.9905, lon: -48.6347, zoom: 14 },
+                "Brusque": { lat: -27.0983, lon: -48.9133, zoom: 13 },
+                "Gaspar": { lat: -26.9317, lon: -48.9558, zoom: 13 },
+                "Indaial": { lat: -26.8961, lon: -49.2308, zoom: 13 },
+                "Timbó": { lat: -26.8242, lon: -49.2719, zoom: 13 },
+                "Pomerode": { lat: -26.7411, lon: -49.1764, zoom: 13 }
+            };
+            const BAIRROS_POR_CIDADE = {
+                "Blumenau": ["Água Verde", "Badenfurt", "Boa Vista", "Bom Retiro", "Centro", "Da Glória", "Do Salto", "Escola Agrícola", "Fidélis", "Fortaleza", "Fortaleza Alta", "Garcia", "Itoupava Central", "Itoupava Norte", "Itoupava Seca", "Itoupavazinha", "Jardim Blumenau", "Nova Esperança", "Passo Manso", "Ponta Aguda", "Progresso", "Ribeirão Fresco", "Salto do Norte", "Salto Weissbach", "Testo Salto", "Tribess", "Valparaíso", "Velha", "Velha Central", "Velha Grande", "Victor Konder", "Vila Formosa", "Vila Itoupava", "Vila Nova", "Vorstadt"],
+                "Itajaí": ["Cabeçudas", "Centro", "Cordeiros", "Dom Bosco", "Espinheiros", "Fazenda", "Imaruí", "Itaipava", "Murta", "Praia Brava", "Ressacada", "Salseiros", "São João", "São Judas", "São Vicente", "Vila Operária"],
+                "Balneário Camboriú": ["Ariribá", "Centro", "Das Nações", "Dos Estados", "Dos Municípios", "Dos Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Vila Real"],
+                "Brusque": ["Águas Claras", "Azambuja", "Bateas", "Centro I", "Centro II", "Dom Joaquim", "Guarani", "Limeira", "Malucher", "Paquetá", "Poço Fundo", "Primeiro de Maio", "Rio Branco", "Santa Luzia", "Santa Rita", "Santa Terezinha", "São Luiz", "São Pedro", "Souza Cruz", "Tomaz Coelho", "Zantão"],
+                "Gaspar": ["Alto Gasparinho", "Arraial D'Ouro", "Bateias", "Bela Vista", "Belchior", "Centro", "Coloninha", "Figueira", "Gaspar Grande", "Gasparinho", "Gaspar Mirim", "Lagoa", "Macucos", "Margem Esquerda", "Poço Grande", "Santa Terezinha", "Sete de Setembro"],
+                "Indaial": ["Amizade", "Arapongas", "Benedito", "Caminho do Sol", "Carijós", "Centro", "Das Nações", "Dos Estados", "Encano", "Estrada das Areias", "João Paulo II", "Mulde", "Ribeirão das Pedras", "Rio Morto", "Sol", "Tapajós", "Warnow"],
+                "Timbó": ["Araponguinhas", "Capitais", "Centro", "Das Nações", "Dos Estados", "Imigrantes", "Padre Martinho Stein", "Quinta dos Açores", "Tiroleses", "Vila Germer"],
+                "Pomerode": ["Centro", "Ribeirão Areia", "Ribeirão Clara", "Ribeirão Luebke", "Testo Alto", "Testo Central", "Testo Rega", "Vila Nova"]
+            };
             const DENOMINATIONS = ['Católica', 'Luterana', 'Batista', 'Assembleia de Deus', 'Outra Evangélica', 'Outra'];
+            const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
             let state = { allChurches: [], map: null, db: null, igrejasCollectionRef: null, selectedChurchId: null, isLoaded: false, loadingTimeout: null };
+
+            const debounce = (func, delay) => {
+                let timeout;
+                return function(...args) {
+                    const context = this;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(context, args), delay);
+                };
+            };
 
             // --- MÓDULO PRINCIPAL ---
             const App = {
@@ -148,15 +194,15 @@
                 },
 
                 initMap() {
-                    state.map = L.map('map-container').setView(MAP_CENTER, 13);
+                    state.map = L.map('map-container').setView(MAP_CENTER, 9); // Zoom para ver o Vale
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(state.map);
                 },
 
                 fetchChurches() {
                     onSnapshot(state.igrejasCollectionRef, (snapshot) => {
                         state.allChurches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        UI.updateFilters();
                         this.filterAndRender();
-                        UI.updateFilters(state.allChurches);
                         this.renderMarkers();
                         UI.hideLoading();
                     }, (error) => {
@@ -166,14 +212,16 @@
 
                 filterAndRender() {
                     const searchTerm = document.getElementById('search-input').value.toLowerCase();
+                    const city = document.getElementById('city-filter').value;
                     const denomination = document.getElementById('denomination-filter').value;
                     const neighborhood = document.getElementById('neighborhood-filter').value;
 
                     const filtered = state.allChurches.filter(church => {
                         const matchesSearch = !searchTerm || (church.name || '').toLowerCase().includes(searchTerm);
+                        const matchesCity = !city || church.city === city;
                         const matchesDenomination = !denomination || church.denomination === denomination;
                         const matchesNeighborhood = !neighborhood || church.neighborhood === neighborhood;
-                        return matchesSearch && matchesDenomination && matchesNeighborhood;
+                        return matchesSearch && matchesCity && matchesDenomination && matchesNeighborhood;
                     }).sort((a,b) => (a.name || '').localeCompare(b.name || ''));
                     
                     UI.renderChurchList(filtered);
@@ -200,8 +248,29 @@
 
                 setupEventListeners() {
                     document.getElementById('search-input').addEventListener('input', () => this.filterAndRender());
+                    document.getElementById('city-filter').addEventListener('change', (e) => {
+                        const city = e.target.value;
+                        if (city && CIDADES_VALE_ITAJAI[city]) {
+                            state.map.setView([CIDADES_VALE_ITAJAI[city].lat, CIDADES_VALE_ITAJAI[city].lon], CIDADES_VALE_ITAJAI[city].zoom);
+                        }
+                        UI.updateFilters();
+                        this.filterAndRender();
+                    });
                     document.getElementById('denomination-filter').addEventListener('change', () => this.filterAndRender());
-                    document.getElementById('neighborhood-filter').addEventListener('change', () => this.filterAndRender());
+                    document.getElementById('neighborhood-filter').addEventListener('change', async (e) => {
+                        const neighborhood = e.target.value;
+                        const city = document.getElementById('city-filter').value;
+
+                        if (neighborhood && city) {
+                            UI.showLoading('A localizar bairro...');
+                            const coords = await API.geocodeAddress(`${neighborhood}, ${city}`);
+                            UI.hideLoading();
+                            if (coords) {
+                                state.map.setView([coords.lat, coords.lon], 15);
+                            }
+                        }
+                        this.filterAndRender();
+                    });
                     document.getElementById('toggle-panel-btn').addEventListener('click', () => {
                         document.getElementById('side-panel').classList.toggle('hidden-mobile');
                     });
@@ -242,98 +311,181 @@
                         listEl.appendChild(card);
                     });
                 },
-                updateFilters: (churches) => {
+                updateFilters: () => {
+                    const cityFilter = document.getElementById('city-filter');
                     const denFilter = document.getElementById('denomination-filter');
                     const neiFilter = document.getElementById('neighborhood-filter');
-                    const denominations = [...new Set(churches.map(c => c.denomination).filter(Boolean))].sort();
-                    const neighborhoods = [...new Set(churches.map(c => c.neighborhood).filter(Boolean))].sort();
-                    denFilter.innerHTML = '<option value="">Todas as Denominações</option>' + denominations.map(d => `<option value="${d}">${d}</option>`).join('');
+                    const selectedCity = cityFilter.value;
+
+                    // Cidades
+                    cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_VALE_ITAJAI).sort().map(c => `<option value="${c}" ${c === selectedCity ? 'selected' : ''}>${c}</option>`).join('');
+
+                    // Denominações
+                    denFilter.innerHTML = '<option value="">Todas as Denominações</option>' + DENOMINATIONS.map(d => `<option value="${d}">${d}</option>`).join('');
+
+                    // Bairros
+                    const neighborhoods = BAIRROS_POR_CIDADE[selectedCity] || [];
                     neiFilter.innerHTML = '<option value="">Todos os Bairros</option>' + neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
+                    neiFilter.disabled = !selectedCity;
+                },
+                ProgressBar: {
+                    show(label) {
+                        const bar = document.getElementById('import-progress-bar');
+                        bar.classList.remove('hidden');
+                        this.update(0, label);
+                    },
+                    hide() {
+                        setTimeout(() => document.getElementById('import-progress-bar').classList.add('hidden'), 3000);
+                    },
+                    update(percentage, label) {
+                        const p = Math.round(percentage);
+                        const bar = document.getElementById('import-progress-bar');
+                        bar.querySelector('#import-progress-fill').style.width = `${p}%`;
+                        bar.querySelector('#import-progress-text').textContent = `${p}%`;
+                        if (label) bar.querySelector('#import-progress-label').textContent = label;
+                    }
                 },
                 Modals: {
-                    _createModal(id, content) {
+                    _createModal(id, content, maxWidth = 'max-w-lg') {
                         const modal = document.createElement('div');
                         modal.id = id;
                         modal.className = 'fixed inset-0 bg-black/60 z-40 hidden items-center justify-center p-4 fade-in';
-                        modal.innerHTML = content;
+                        modal.innerHTML = `<div class="bg-white rounded-lg shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh]">${content}</div>`;
                         document.getElementById('modal-container').appendChild(modal);
-                        modal.querySelector('.close-modal-btn')?.addEventListener('click', () => modal.classList.add('hidden'));
+                        modal.querySelector('.close-modal-btn')?.addEventListener('click', () => modal.remove());
                         return modal;
                     },
                     openDetails(church) {
-                        let modal = document.getElementById('details-modal');
-                        let scheduleHtml = (church.schedule || []).map(s => `<div class="flex justify-between text-sm py-1.5 border-b border-slate-100"><span class="font-medium text-slate-600">${s.day}</span><span class="text-slate-800">${s.time}</span></div>`).join('') || '<p class="text-sm text-slate-500">Horários não informados.</p>';
+                        let scheduleHtml = (church.schedule || []).map(s => {
+                            const timeText = s.endTime ? `${s.startTime} - ${s.endTime}` : s.startTime;
+                            return `<div class="flex justify-between text-sm py-1.5 border-b border-slate-100"><span class="font-medium text-slate-600">${s.day}</span><span class="text-slate-800">${timeText}</span></div>`;
+                        }).join('') || '<p class="text-sm text-slate-500">Horários não informados.</p>';
 
                         const content = `
-                            <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-                                <header class="p-4 bg-slate-50 rounded-t-lg border-b flex justify-between items-start">
-                                    <div><h2 class="text-xl font-bold text-slate-900">${church.name}</h2><p class="text-sm text-slate-600">${church.address}</p></div>
-                                    <button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button>
-                                </header>
-                                <div class="p-4 custom-scrollbar overflow-y-auto">
-                                    <div class="mb-4"><h4 class="font-semibold mb-2">Horários</h4>${scheduleHtml}</div>
-                                    <div class="mb-4"><h4 class="font-semibold mb-2">Contacto</h4><p class="text-sm text-slate-600"><strong>Líder:</strong> ${church.leader || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Telefone:</strong> ${church.phone || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Website:</strong> ${church.website ? `<a href="${church.website}" target="_blank" class="text-sky-600 hover:underline">Visitar</a>` : 'Não informado'}</p></div>
-                                </div>
-                                <footer class="p-4 border-t flex gap-2">
-                                     <a href="https://www.google.com/maps/dir/?api=1&destination=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-sky-600 text-white font-semibold py-2 rounded-md hover:bg-sky-700 transition">Obter Rota</a>
-                                     <button data-id="${church.id}" class="edit-btn flex-1 bg-slate-200 font-semibold py-2 rounded-md hover:bg-slate-300">Editar</button>
-                                </footer>
-                            </div>`;
-                        if (modal) modal.remove();
-                        modal = this._createModal('details-modal', content);
+                            <header class="p-4 bg-slate-50 rounded-t-lg border-b flex justify-between items-start">
+                                <div><h2 class="text-xl font-bold text-slate-900">${church.name}</h2><p class="text-sm text-slate-600">${church.address}</p></div>
+                                <button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button>
+                            </header>
+                            <div class="p-4 custom-scrollbar overflow-y-auto">
+                                <div class="mb-4"><h4 class="font-semibold mb-2">Horários</h4>${scheduleHtml}</div>
+                                <div class="mb-4"><h4 class="font-semibold mb-2">Contacto</h4><p class="text-sm text-slate-600"><strong>Líder:</strong> ${church.leader || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Telefone:</strong> ${church.phone || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Website:</strong> ${church.website ? `<a href="${church.website}" target="_blank" class="text-sky-600 hover:underline">Visitar</a>` : 'Não informado'}</p></div>
+                            </div>
+                            <footer class="p-4 border-t flex gap-2">
+                                 <a href="https://www.google.com/maps/dir/?api=1&destination=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-sky-600 text-white font-semibold py-2 rounded-md hover:bg-sky-700 transition">Obter Rota</a>
+                                 <button class="edit-btn flex-1 bg-slate-200 font-semibold py-2 rounded-md hover:bg-slate-300">Editar</button>
+                            </footer>`;
+                        const modal = this._createModal('details-modal', content);
                         modal.classList.remove('hidden');
-                        modal.querySelector('.edit-btn').addEventListener('click', () => { this.openAddEdit(church); });
+                        modal.querySelector('.edit-btn').addEventListener('click', () => { modal.remove(); this.openAddEdit(church); });
                     },
                     openAddEdit(church = {}) {
                         const isEditing = !!church.id;
-                        const modalId = 'add-edit-modal';
-                        let modal = document.getElementById(modalId);
-                        const scheduleHtml = (church.schedule || [{day: '', time: ''}]).map((s, i) => `
+                        
+                        let timeOptionsHtml = '';
+                        for (let h = 7; h < 23; h++) {
+                            for (let m = 0; m < 60; m+=30) {
+                                const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                timeOptionsHtml += `<option value="${time}">${time}</option>`;
+                            }
+                        }
+
+                        const scheduleHtml = (church.schedule || [{day: '', startTime: '', endTime: ''}]).map((s, i) => {
+                            const dayOptions = DIAS_SEMANA.map(dia => `<option value="${dia}" ${s.day === dia ? 'selected' : ''}>${dia}</option>`).join('');
+                            const startTimeOptions = timeOptionsHtml.replace(`value="${s.startTime}"`, `value="${s.startTime}" selected`);
+                            const endTimeOptions = timeOptionsHtml.replace(`value="${s.endTime}"`, `value="${s.endTime}" selected`);
+
+                            return `
                             <div class="flex items-center gap-2 schedule-row">
-                                <input type="text" value="${s.day}" placeholder="Dia (ex: Domingo)" class="w-1/2 border-slate-300 rounded-md text-sm schedule-day">
-                                <input type="text" value="${s.time}" placeholder="Horário (ex: 19:30)" class="w-1/2 border-slate-300 rounded-md text-sm schedule-time">
+                                <select class="w-1/3 border-slate-300 rounded-md text-sm schedule-day">
+                                    <option value="">Selecione o dia</option>
+                                    ${dayOptions}
+                                </select>
+                                <div class="flex items-center gap-1 w-2/3">
+                                    <select class="w-1/2 border-slate-300 rounded-md text-sm schedule-start-time">
+                                        <option value="">Início</option>
+                                        ${startTimeOptions}
+                                    </select>
+                                    <span class="text-slate-500 text-xs">às</span>
+                                    <select class="w-1/2 border-slate-300 rounded-md text-sm schedule-end-time">
+                                        <option value="">Fim</option>
+                                        ${endTimeOptions}
+                                    </select>
+                                </div>
                                 <button type="button" class="${i === 0 ? 'add-schedule-btn' : 'remove-schedule-btn'} text-sm">${i === 0 ? '<i class="fa fa-plus text-green-500"></i>' : '<i class="fa fa-trash text-red-500"></i>'}</button>
-                            </div>
-                        `).join('');
+                            </div>`;
+                        }).join('');
 
                         const content = `
-                            <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-                                <header class="p-4"><h2 class="text-xl font-bold">${isEditing ? 'Editar' : 'Adicionar'} Igreja</h2></header>
-                                <div class="p-4 custom-scrollbar overflow-y-auto space-y-4">
-                                    <div><label class="text-sm font-medium">Nome*</label><input id="form-name" type="text" class="w-full border-slate-300 rounded-md" value="${church.name || ''}"></div>
-                                    <div><label class="text-sm font-medium">Endereço</label><input id="form-address" type="text" class="w-full border-slate-300 rounded-md" value="${church.address || ''}"></div>
-                                    <div><label class="text-sm font-medium">Bairro</label><input id="form-neighborhood" type="text" class="w-full border-slate-300 rounded-md" value="${church.neighborhood || ''}"></div>
-                                    <div><label class="text-sm font-medium">Denominação</label><select id="form-denomination" class="w-full border-slate-300 rounded-md">${DENOMINATIONS.map(d => `<option value="${d}" ${church.denomination === d ? 'selected' : ''}>${d}</option>`)}</select></div>
-                                    <div><label class="text-sm font-medium">Horários</label><div id="schedule-container" class="space-y-2">${scheduleHtml}</div></div>
-                                    <div><label class="text-sm font-medium">Líder</label><input id="form-leader" type="text" class="w-full border-slate-300 rounded-md" value="${church.leader || ''}"></div>
-                                    <div><label class="text-sm font-medium">Telefone</label><input id="form-phone" type="text" class="w-full border-slate-300 rounded-md" value="${church.phone || ''}"></div>
-                                    <div><label class="text-sm font-medium">Website</label><input id="form-website" type="text" class="w-full border-slate-300 rounded-md" value="${church.website || ''}"></div>
-                                    <div><label class="text-sm font-medium">Localização* (Clique no mapa)</label><div id="form-map" class="h-48 rounded-md"></div><input id="form-lat" type="hidden" value="${church.coords?.[0] || ''}"><input id="form-lng" type="hidden" value="${church.coords?.[1] || ''}"></div>
-                                </div>
-                                <footer class="p-4 border-t flex justify-end gap-2">
-                                    <button class="close-modal-btn bg-slate-200 font-semibold py-2 px-4 rounded-md">Cancelar</button>
-                                    <button id="save-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded-md">Salvar</button>
-                                </footer>
-                            </div>`;
-                        if (modal) modal.remove();
-                        modal = this._createModal(modalId, content);
+                            <header class="p-4 border-b"><h2 class="text-xl font-bold">${isEditing ? 'Editar' : 'Adicionar'} Igreja</h2></header>
+                            <div class="p-4 custom-scrollbar overflow-y-auto space-y-6">
+                                <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Informações Principais</legend><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"><div><label class="text-sm font-medium">Nome*</label><input id="form-name" type="text" class="w-full border-slate-300 rounded-md" value="${church.name || ''}"></div><div><label class="text-sm font-medium">Denominação</label><select id="form-denomination" class="w-full border-slate-300 rounded-md">${DENOMINATIONS.map(d => `<option value="${d}" ${church.denomination === d ? 'selected' : ''}>${d}</option>`)}</select></div><div><label class="text-sm font-medium">Cidade*</label><select id="form-city" class="w-full border-slate-300 rounded-md">${Object.keys(CIDADES_VALE_ITAJAI).map(c => `<option value="${c}" ${church.city === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div></div></fieldset>
+                                <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Horários de Atividades</legend><div id="schedule-container" class="mt-2 space-y-2">${scheduleHtml}</div></fieldset>
+                                <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Contacto</legend><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"><div><label class="text-sm font-medium">Líder</label><input id="form-leader" type="text" class="w-full border-slate-300 rounded-md" value="${church.leader || ''}"></div><div><label class="text-sm font-medium">Telefone</label><input id="form-phone" type="text" class="w-full border-slate-300 rounded-md" value="${church.phone || ''}"></div><div class="md:col-span-2"><label class="text-sm font-medium">Website</label><input id="form-website" type="text" class="w-full border-slate-300 rounded-md" value="${church.website || ''}"></div></div></fieldset>
+                                <fieldset class="border-t pt-4"><legend class="text-sm font-semibold text-sky-700 px-2 -ml-2">Localização no Mapa*</legend>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                        <input id="form-cep" type="text" placeholder="Digite o CEP..." class="border-slate-300 rounded-md text-sm">
+                                        <input id="form-rua" type="text" placeholder="Ou digite a Rua e Número..." class="border-slate-300 rounded-md text-sm">
+                                    </div>
+                                    <p class="text-xs text-slate-500 my-2">O endereço será procurado automaticamente. Em alternativa, clique no mapa abaixo.</p>
+                                    <div id="form-map" class="h-64 rounded-md"></div>
+                                    <input id="form-lat" type="hidden" value="${church.coords?.[0] || ''}"><input id="form-lng" type="hidden" value="${church.coords?.[1] || ''}">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                        <div><label class="text-sm font-medium">Endereço Completo</label><input id="form-address" type="text" class="w-full border-slate-300 rounded-md bg-slate-50" value="${church.address || ''}" readonly></div>
+                                        <div><label class="text-sm font-medium">Bairro</label><input id="form-neighborhood" type="text" class="w-full border-slate-300 rounded-md bg-slate-50" value="${church.neighborhood || ''}" readonly></div>
+                                    </div>
+                                </fieldset>
+                            </div>
+                            <footer class="p-4 border-t flex justify-end gap-2">
+                                <button class="close-modal-btn bg-slate-200 font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                                <button id="save-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded-md">Salvar</button>
+                            </footer>`;
+
+                        const modal = this._createModal('add-edit-modal', content, 'max-w-3xl');
                         modal.classList.remove('hidden');
 
-                        const formMap = L.map('form-map').setView(church.coords || MAP_CENTER, 15);
+                        const formMap = L.map('form-map').setView(church.coords || MAP_CENTER, church.coords ? 17 : 13);
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(formMap);
                         let marker = church.coords ? L.marker(church.coords).addTo(formMap) : null;
-                        formMap.on('click', e => {
-                            document.getElementById('form-lat').value = e.latlng.lat;
-                            document.getElementById('form-lng').value = e.latlng.lng;
-                            if (marker) marker.setLatLng(e.latlng);
-                            else marker = L.marker(e.latlng).addTo(formMap);
-                        });
                         
-                        document.getElementById('schedule-container').addEventListener('click', e => {
+                        const updateLocation = (lat, lng, zoom = 17) => {
+                             document.getElementById('form-lat').value = lat;
+                             document.getElementById('form-lng').value = lng;
+                             formMap.setView([lat, lng], zoom);
+                             if (marker) marker.setLatLng([lat, lng]);
+                             else marker = L.marker([lat, lng]).addTo(formMap);
+                             API.fetchAddressForCoords(lat, lng).then(addr => {
+                                if (addr) {
+                                    document.getElementById('form-address').value = addr.address;
+                                    document.getElementById('form-neighborhood').value = addr.neighborhood;
+                                }
+                             });
+                        };
+                        
+                        const handleAddressSearch = debounce(async () => {
+                            const cep = modal.querySelector('#form-cep').value;
+                            const rua = modal.querySelector('#form-rua').value;
+                            let query = '';
+
+                            if (cep && cep.replace(/\D/g, '').length === 8) {
+                                const viaCepData = await API.fetchCEP(cep);
+                                if (viaCepData) query = `${viaCepData.logradouro}, ${viaCepData.bairro}, ${viaCepData.localidade}`;
+                            } else if (rua.length > 5) {
+                                query = `${rua}, ${document.getElementById('form-city').value}`;
+                            } else { return; }
+
+                            const coords = await API.geocodeAddress(query);
+                            if (coords) updateLocation(coords.lat, coords.lon);
+                        }, 800);
+
+                        formMap.on('click', e => updateLocation(e.latlng.lat, e.latlng.lng));
+                        modal.querySelector('#form-cep').addEventListener('input', handleAddressSearch);
+                        modal.querySelector('#form-rua').addEventListener('input', handleAddressSearch);
+                        
+                        modal.querySelector('#schedule-container').addEventListener('click', e => {
                             if (e.target.closest('.add-schedule-btn')) {
                                 const container = document.getElementById('schedule-container');
                                 const newRow = container.querySelector('.schedule-row').cloneNode(true);
-                                newRow.querySelectorAll('input').forEach(i => i.value = '');
+                                newRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
                                 newRow.querySelector('button').innerHTML = '<i class="fa fa-trash text-red-500"></i>';
                                 newRow.querySelector('button').classList.replace('add-schedule-btn', 'remove-schedule-btn');
                                 container.appendChild(newRow);
@@ -342,36 +494,253 @@
                             }
                         });
 
-                        document.getElementById('save-btn').addEventListener('click', async () => {
+                        modal.querySelector('#save-btn').addEventListener('click', async () => {
                             const lat = parseFloat(document.getElementById('form-lat').value);
                             const lng = parseFloat(document.getElementById('form-lng').value);
-                            const schedule = [...document.querySelectorAll('.schedule-row')].map(row => ({
-                                day: row.querySelector('.schedule-day').value,
-                                time: row.querySelector('.schedule-time').value
-                            })).filter(s => s.day && s.time);
-
-                            const data = {
-                                name: document.getElementById('form-name').value,
-                                address: document.getElementById('form-address').value,
-                                neighborhood: document.getElementById('form-neighborhood').value,
-                                denomination: document.getElementById('form-denomination').value,
-                                schedule: schedule,
-                                leader: document.getElementById('form-leader').value,
-                                phone: document.getElementById('form-phone').value,
-                                website: document.getElementById('form-website').value,
-                                coords: (lat && lng) ? [lat, lng] : null
-                            };
+                            const schedule = [...document.querySelectorAll('.schedule-row')].map(row => ({ 
+                                day: row.querySelector('.schedule-day').value, 
+                                startTime: row.querySelector('.schedule-start-time').value,
+                                endTime: row.querySelector('.schedule-end-time').value 
+                            })).filter(s => s.day && s.startTime);
+                            const data = { name: document.getElementById('form-name').value, city: document.getElementById('form-city').value, address: document.getElementById('form-address').value, neighborhood: document.getElementById('form-neighborhood').value, denomination: document.getElementById('form-denomination').value, schedule: schedule, leader: document.getElementById('form-leader').value, phone: document.getElementById('form-phone').value, website: document.getElementById('form-website').value, coords: (lat && lng) ? [lat, lng] : null };
                             
                             UI.showLoading('A salvar...');
                             try {
                                 if (isEditing) await setDoc(doc(state.igrejasCollectionRef, church.id), data);
                                 else await addDoc(state.igrejasCollectionRef, data);
-                                modal.classList.add('hidden');
+                                modal.remove();
                             } catch (err) { alert('Erro ao salvar.'); } finally { UI.hideLoading(); }
                         });
                     },
-                    openAdmin() { /* ... */ },
-                    openConfirm() { /* ... */ }
+                    openAdmin() {
+                        const content = `
+                            <header class="p-4 border-b flex justify-between items-center"><h2 class="text-xl font-bold">Ferramentas Administrativas</h2><button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button></header>
+                            <div class="p-4 space-y-3">
+                                <button id="import-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Assistente de Importação Inteligente</button>
+                                <button id="clear-map-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Limpar Base de Dados</button>
+                                <button id="test-connection-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Testar Ligação</button>
+                            </div>`;
+                        const modal = this._createModal('admin-modal', content, 'max-w-md');
+                        modal.classList.remove('hidden');
+                        modal.querySelector('#import-btn').addEventListener('click', () => { modal.remove(); this.openImportAssistant(); });
+                        modal.querySelector('#clear-map-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'clear' }); });
+                        modal.querySelector('#test-connection-btn').addEventListener('click', async () => { UI.showLoading('A testar...'); try { await getDocs(query(state.igrejasCollectionRef, limit(1))); alert('Ligação com Firebase OK!'); } catch(e) { alert(`Falha na ligação: ${e.message}`); } finally { UI.hideLoading(); }});
+                    },
+                    openConfirm({ action }) {
+                        const options = {
+                            clear: { title: 'Limpar Base de Dados', message: 'Isto irá apagar TUDO. Requer senha.' }
+                        };
+                        const content = `
+                            <div class="p-6 text-center">
+                                <h3 class="text-lg font-bold">${options[action].title}</h3>
+                                <p class="mt-2 text-sm text-slate-600">${options[action].message}</p>
+                                <div class="mt-4"><input type="password" id="admin-password" placeholder="Senha de Administrador" class="w-full border-slate-300 rounded-lg text-center"></div>
+                                <div class="mt-6 flex justify-center gap-4">
+                                    <button class="close-modal-btn px-6 py-2 bg-slate-200 font-semibold rounded-md">Cancelar</button>
+                                    <button id="confirm-action-btn" class="px-6 py-2 bg-sky-600 text-white font-semibold rounded-md">Confirmar</button>
+                                </div>
+                            </div>`;
+                        const modal = this._createModal('confirm-modal', content, 'max-w-sm');
+                        modal.classList.remove('hidden');
+                        modal.querySelector('#confirm-action-btn').addEventListener('click', () => {
+                            if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
+                                modal.remove();
+                                if (action === 'clear') Admin.clearMap();
+                            } else {
+                                alert('Senha incorreta!');
+                            }
+                        });
+                    },
+                    openImportAssistant() {
+                        let step = 1;
+                        let searchResults = [];
+
+                        const render = () => {
+                            let content = '';
+                            if (step === 1) {
+                                content = `
+                                    <header class="p-4 border-b"><h2 class="text-xl font-bold">Assistente de Importação Inteligente</h2></header>
+                                    <div class="p-4 space-y-4">
+                                        <p class="text-sm">O assistente irá procurar por locais de culto (igrejas, templos, etc.). Escolha um método de busca:</p>
+                                        <button id="search-area-btn" class="w-full bg-blue-100 text-blue-800 font-semibold py-2 rounded-md hover:bg-blue-200 transition">1. Procurar na área visível do mapa</button>
+                                        <div class="relative"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-300"></div></div><div class="relative flex justify-center text-sm"><span class="bg-white px-2 text-slate-500">Ou</span></div></div>
+                                        <div><label class="text-sm font-medium">2. Procurar em Cidade/Bairro Específico</label>
+                                            <div class="flex gap-2 mt-1">
+                                                <select id="import-city" class="w-1/2 border-slate-300 rounded-md">${Object.keys(CIDADES_VALE_ITAJAI).map(c => `<option value="${c}">${c}</option>`).join('')}</select>
+                                                <select id="import-neighborhood" class="w-1/2 border-slate-300 rounded-md"></select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <footer class="p-4 border-t flex justify-end gap-2"><button class="close-modal-btn bg-slate-200 font-semibold py-2 px-4 rounded-md">Cancelar</button><button id="next-step-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded-md">Procurar no Local Específico</button></footer>`;
+                            } else if (step === 2) {
+                                const newResults = searchResults.filter(r => !r.isDuplicate);
+                                content = `
+                                    <header class="p-4 border-b"><h2 class="text-xl font-bold">Assistente de Importação - Passo 2</h2></header>
+                                    <div class="p-4 space-y-4">
+                                        <p class="text-sm">Encontrámos ${searchResults.length} resultado(s). ${newResults.length} são novos. Selecione os que deseja importar.</p>
+                                        <div id="import-results" class="max-h-64 overflow-y-auto custom-scrollbar border rounded-md divide-y">
+                                            ${searchResults.map((r, i) => `
+                                                <div class="p-2 flex items-center gap-3 ${r.isDuplicate ? 'bg-slate-100 text-slate-400' : ''}">
+                                                    <input type="checkbox" id="import-check-${i}" class="h-4 w-4" ${r.isDuplicate ? 'disabled' : 'checked'}>
+                                                    <div>
+                                                        <label for="import-check-${i}" class="font-semibold">${r.name}</label>
+                                                        <p class="text-xs">${r.address}</p>
+                                                        ${r.isDuplicate ? '<p class="text-xs text-amber-600">Possível duplicado já existente.</p>' : ''}
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                    <footer class="p-4 border-t flex justify-between gap-2"><button id="prev-step-btn" class="bg-slate-200 font-semibold py-2 px-4 rounded-md">Voltar</button><button id="import-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded-md">Importar Selecionados</button></footer>`;
+                            }
+                            
+                            const modal = this._createModal('import-modal', content, 'max-w-xl');
+                            modal.classList.remove('hidden');
+
+                            if (step === 1) {
+                                const citySelect = modal.querySelector('#import-city');
+                                const neighborhoodSelect = modal.querySelector('#import-neighborhood');
+                                const updateNeighborhoods = () => {
+                                    const city = citySelect.value;
+                                    const neighborhoods = BAIRROS_POR_CIDADE[city] || [];
+                                    neighborhoodSelect.innerHTML = '<option value="">Toda a cidade</option>' + neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
+                                };
+                                updateNeighborhoods();
+                                citySelect.addEventListener('change', updateNeighborhoods);
+
+                                modal.querySelector('#next-step-btn').addEventListener('click', async () => {
+                                    const city = citySelect.value;
+                                    const neighborhood = neighborhoodSelect.value;
+                                    modal.remove();
+                                    UI.showLoading('A procurar...');
+                                    searchResults = await Admin.scanMap(city, neighborhood);
+                                    UI.hideLoading();
+                                    step = 2;
+                                    render();
+                                });
+
+                                modal.querySelector('#search-area-btn').addEventListener('click', async () => {
+                                    modal.remove();
+                                    UI.showLoading('A procurar na área visível...');
+                                    searchResults = await Admin.scanMap(null, null, state.map.getBounds());
+                                    UI.hideLoading();
+                                    step = 2;
+                                    render();
+                                });
+                            } else if (step === 2) {
+                                modal.querySelector('#prev-step-btn').addEventListener('click', () => { modal.remove(); step = 1; render(); });
+                                modal.querySelector('#import-btn').addEventListener('click', async () => {
+                                    const toImport = [];
+                                    searchResults.forEach((r, i) => {
+                                        if (document.getElementById(`import-check-${i}`).checked) toImport.push(r);
+                                    });
+                                    modal.remove();
+                                    if(toImport.length > 0) Admin.importChurches(toImport);
+                                });
+                            }
+                        };
+                        render();
+                    }
+                }
+            };
+            
+            // --- MÓDULO DE ADMINISTRAÇÃO E API ---
+            const Admin = {
+                async scanMap(city, neighborhood = null, bounds = null) {
+                    let params = new URLSearchParams({
+                        format: 'jsonv2',
+                        bounded: 1,
+                        limit: 50,
+                        amenity: 'place_of_worship'
+                    });
+
+                    let cityForNewEntries = city;
+
+                    if (bounds) {
+                        params.set('viewbox', `${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()},${bounds.getSouth()}`);
+                        cityForNewEntries = 'Não especificada';
+                    } else if (city && CIDADES_VALE_ITAJAI[city]) {
+                        const cityBounds = CIDADES_VALE_ITAJAI[city];
+                        params.set('viewbox', `${cityBounds.lon - 0.1},${cityBounds.lat + 0.1},${cityBounds.lon + 0.1},${cityBounds.lat - 0.1}`);
+                        if (neighborhood) {
+                           params.set('q', `${neighborhood}, ${city}`);
+                        }
+                    } else {
+                        return [];
+                    }
+                    
+                    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+
+                    try {
+                        const response = await fetch(url);
+                        const results = await response.json();
+                        return results.map(r => {
+                            const lat = parseFloat(r.lat);
+                            const lon = parseFloat(r.lon);
+                            const isDuplicate = state.allChurches.some(church => church.coords && Math.sqrt(Math.pow(church.coords[0] - lat, 2) + Math.pow(church.coords[1] - lon, 2)) < 0.0002);
+                            return { name: r.display_name.split(',')[0], address: r.display_name, lat, lon, isDuplicate, city: cityForNewEntries };
+                        });
+                    } catch (e) { console.error("Erro ao escanear:", e); return []; }
+                },
+                async importChurches(churchesToImport) {
+                    const total = churchesToImport.length;
+                    UI.ProgressBar.show(`A importar 0 de ${total}...`);
+                    let importedCount = 0;
+
+                    for (const church of churchesToImport) {
+                        const addr = await API.fetchAddressForCoords(church.lat, church.lon);
+                        const city = church.city === 'Não especificada' ? (addr.city || 'Não especificada') : church.city;
+
+                        await addDoc(state.igrejasCollectionRef, {
+                            name: church.name,
+                            city: city,
+                            address: addr.address,
+                            neighborhood: addr.neighborhood,
+                            coords: [church.lat, church.lon],
+                            denomination: 'Outra',
+                            schedule: [], leader: '', phone: '', website: ''
+                        });
+                        importedCount++;
+                        const percentage = (importedCount / total) * 100;
+                        UI.ProgressBar.update(percentage, `A importar ${importedCount} de ${total}...`);
+                    }
+                    UI.ProgressBar.update(100, `Importação concluída!`);
+                    UI.ProgressBar.hide();
+                },
+                async clearMap() { 
+                    UI.showLoading('A apagar...');
+                    const batch = writeBatch(state.db);
+                    state.allChurches.forEach(church => batch.delete(doc(state.igrejasCollectionRef, church.id)));
+                    await batch.commit();
+                    UI.hideLoading();
+                }
+            };
+            const API = {
+                async fetchAddressForCoords(lat, lon) {
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+                    try {
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        return {
+                            address: data.display_name || '',
+                            neighborhood: data.address?.suburb || data.address?.city_district || '',
+                            city: data.address?.city || data.address?.town || data.address?.village || ''
+                        };
+                    } catch (e) { console.error("Erro no geocoding:", e); return null; }
+                },
+                async fetchCEP(cep) {
+                    const url = `https://viacep.com.br/ws/${cep.replace(/\D/g, '')}/json/`;
+                    try { const res = await fetch(url); const data = await res.json(); return data.erro ? null : data; } 
+                    catch (e) { console.error("Erro ao buscar CEP:", e); return null; }
+                },
+                async geocodeAddress(addressQuery) {
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(addressQuery)}`;
+                    try {
+                        const res = await fetch(url); const data = await res.json();
+                        if (data && data.length > 0) {
+                             return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                        } return null;
+                    } catch (e) { console.error("Erro no geocoding:", e); return null; }
                 }
             };
             
