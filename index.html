@@ -13,11 +13,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Leaflet.js -->
+    <!-- Leaflet.js for Interactive Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Font Awesome -->
+    <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
@@ -30,17 +30,29 @@
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
         .slide-in-left { animation: slideInLeft 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both; }
         @keyframes slideInLeft { 0% { transform: translateX(-100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+        
+        /* Mobile responsive side panel */
         @media (max-width: 768px) {
             #side-panel { transition: transform 0.3s ease-in-out; }
             #side-panel.hidden-mobile { transform: translateX(-100%); }
         }
+        
+        /* Ensure map tiles are visible */
         .leaflet-container { z-index: 0; }
 
+        /* Print-specific styles for reports */
         @media print {
             body * { visibility: hidden; }
             #printable-report, #printable-report * { visibility: visible; }
-            #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
+            #printable-report { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
             .no-print { display: none; }
+        }
+        
+        /* Tab styles */
+        .tab-btn.active {
+            border-color: #0ea5e9;
+            color: #0ea5e9;
+            background-color: #f0f9ff;
         }
     </style>
 </head>
@@ -48,7 +60,7 @@
 
     <div id="app-container" class="h-full w-full relative flex">
 
-        <!-- PAINEL LATERAL -->
+        <!-- SIDE PANEL -->
         <aside id="side-panel" class="absolute md:relative z-20 w-full md:w-[380px] h-full bg-white shadow-lg flex flex-col transition-transform slide-in-left">
             <header class="p-4 border-b border-slate-200 flex-shrink-0">
                 <div class="flex items-center gap-3">
@@ -61,6 +73,7 @@
                  <p id="church-count-display" class="text-xs text-slate-500 mt-2"></p>
             </header>
 
+            <!-- Search and Filter Controls -->
             <div class="p-4 flex-shrink-0 border-b border-slate-200 space-y-3">
                 <div class="relative">
                     <i class="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -72,8 +85,10 @@
                 </div>
             </div>
 
+            <!-- List of Churches -->
             <div id="church-list" class="flex-grow overflow-y-auto custom-scrollbar p-2"></div>
 
+            <!-- Footer with Actions -->
             <footer class="p-4 flex-shrink-0 border-t border-slate-200 flex items-center justify-between">
                 <button id="add-church-btn" class="w-full bg-sky-600 text-white font-semibold py-2.5 rounded-md hover:bg-sky-700 transition flex items-center justify-center gap-2">
                     <i class="fa fa-plus"></i> Adicionar Igreja
@@ -84,60 +99,40 @@
             </footer>
         </aside>
 
-        <!-- MAPA -->
+        <!-- MAP -->
         <main id="map-container" class="flex-grow h-full"></main>
         
+        <!-- Mobile Toggle Button -->
         <button id="toggle-panel-btn" class="md:hidden absolute z-30 top-4 left-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-slate-700">
             <i class="fa fa-bars"></i>
         </button>
     </div>
     
-    <!-- MODAIS E OUTROS ELEMENTOS FLUTUANTES -->
+    <!-- MODALS AND OTHER FLOATING ELEMENTS -->
     <div id="floating-elements-container">
         <div id="modal-container"></div>
         <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] space-y-2"></div>
     </div>
     
-    <!-- OVERLAY DE CARREGAMENTO INICIAL -->
+    <!-- INITIAL LOADING OVERLAY -->
     <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
         <i class="fa fa-church fa-spin text-5xl text-sky-600"></i>
         <p id="loading-text" class="mt-4 text-slate-700 font-semibold">A carregar o portal...</p>
     </div>
 
     <script type="module">
+        // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, setDoc, deleteDoc, doc, getDocs, query, limit, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         document.addEventListener('DOMContentLoaded', () => {
 
-            const USER_FIREBASE_CONFIG = {
-                apiKey: "AIzaSyDXmAZ-VW7Ti1_L5GPW0gNBkfGxMmxvypQ",
-                authDomain: "controle-de-igrejas.firebaseapp.com",
-                projectId: "controle-de-igrejas",
-                storageBucket: "controle-de-igrejas.firebasestorage.app",
-                messagingSenderId: "457376397325",
-                appId: "1:457376397325:web:aacc6cef3e91390314fd44",
-                measurementId: "G-PENC7PPT4M"
-            };
-            
-            const ADMIN_PASSWORD = "2308";
-            const MAP_CENTER = [-27.21, -49.64]; // Centro de SC
+            // --- CONSTANTS AND CONFIGURATION ---
+            const MAP_CENTER = [-27.21, -49.64]; // Center of Santa Catarina
             const SANTA_CATARINA_BOUNDS = { minLat: -29.4, maxLat: -25.9, minLon: -53.8, maxLon: -48.3 };
             const CIDADES_SC = {
-                "Blumenau": { lat: -26.9194, lon: -49.0661, zoom: 12 },
-                "Florianópolis": { lat: -27.5954, lon: -48.5480, zoom: 12 },
-                "Joinville": { lat: -26.3031, lon: -48.8456, zoom: 12 },
-                "São José": { lat: -27.6146, lon: -48.6283, zoom: 13 },
-                "Chapecó": { lat: -27.1002, lon: -52.6152, zoom: 13 },
-                "Criciúma": { lat: -28.6775, lon: -49.3697, zoom: 13 },
-                "Itajaí": { lat: -26.9075, lon: -48.6619, zoom: 13 },
-                "Balneário Camboriú": { lat: -26.9905, lon: -48.6347, zoom: 14 },
-                "Brusque": { lat: -27.0983, lon: -48.9133, zoom: 13 },
-                "Gaspar": { lat: -26.9317, lon: -48.9558, zoom: 13 },
-                "Indaial": { lat: -26.8961, lon: -49.2308, zoom: 13 },
-                "Timbó": { lat: -26.8242, lon: -49.2719, zoom: 13 },
-                "Pomerode": { lat: -26.7411, lon: -49.1764, zoom: 13 }
+                "Blumenau": { lat: -26.9194, lon: -49.0661, zoom: 12 }, "Florianópolis": { lat: -27.5954, lon: -48.5480, zoom: 12 }, "Joinville": { lat: -26.3031, lon: -48.8456, zoom: 12 }, "São José": { lat: -27.6146, lon: -48.6283, zoom: 13 }, "Chapecó": { lat: -27.1002, lon: -52.6152, zoom: 13 }, "Criciúma": { lat: -28.6775, lon: -49.3697, zoom: 13 }, "Itajaí": { lat: -26.9075, lon: -48.6619, zoom: 13 }, "Balneário Camboriú": { lat: -26.9905, lon: -48.6347, zoom: 14 }, "Brusque": { lat: -27.0983, lon: -48.9133, zoom: 13 }, "Gaspar": { lat: -26.9317, lon: -48.9558, zoom: 13 }, "Indaial": { lat: -26.8961, lon: -49.2308, zoom: 13 }, "Timbó": { lat: -26.8242, lon: -49.2719, zoom: 13 }, "Pomerode": { lat: -26.7411, lon: -49.1764, zoom: 13 }
             };
             const BAIRROS_POR_CIDADE = {
                 "Blumenau": ["Água Verde", "Badenfurt", "Boa Vista", "Bom Retiro", "Centro", "Da Glória", "Do Salto", "Escola Agrícola", "Fidélis", "Fortaleza", "Fortaleza Alta", "Garcia", "Itoupava Central", "Itoupava Norte", "Itoupava Seca", "Itoupavazinha", "Jardim Blumenau", "Nova Esperança", "Passo Manso", "Ponta Aguda", "Progresso", "Ribeirão Fresco", "Salto do Norte", "Salto Weissbach", "Testo Salto", "Tribess", "Valparaíso", "Velha", "Velha Central", "Velha Grande", "Victor Konder", "Vila Formosa", "Vila Itoupava", "Vila Nova", "Vorstadt"],
@@ -152,40 +147,42 @@
             const DENOMINATIONS = ['Católica', 'Luterana', 'Batista', 'Assembleia de Deus', 'Outra Evangélica', 'Outra'];
             const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
-            let state = { allChurches: [], filteredChurches: [], map: null, db: null, igrejasCollectionRef: null, selectedChurchId: null, isLoaded: false, loadingTimeout: null, isCaptureMode: false };
+            // --- APPLICATION STATE ---
+            let state = { allChurches: [], filteredChurches: [], map: null, db: null, igrejasCollectionRef: null, selectedChurchId: null, isLoaded: false, loadingTimeout: null };
 
-            const debounce = (func, delay) => {
-                let timeout;
-                return function(...args) {
-                    const context = this;
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(context, args), delay);
-                };
-            };
-
-            // --- MÓDULO PRINCIPAL ---
+            // --- MAIN APP LOGIC ---
             const App = {
-                init() {
+                async init() {
                     UI.showLoading('A inicializar...');
                     state.loadingTimeout = setTimeout(() => {
                         if (!state.isLoaded) UI.showError('A aplicação demorou a responder', '', true);
                     }, 10000);
 
-                    if (!USER_FIREBASE_CONFIG?.apiKey) {
-                        return UI.showError("Configuração Incompleta", "Por favor, cole as credenciais do seu projeto Firebase no ficheiro HTML.");
-                    }
-                    
                     try {
-                        const firebaseApp = initializeApp(USER_FIREBASE_CONFIG);
-                        state.db = getFirestore(firebaseApp);
-                        state.igrejasCollectionRef = collection(state.db, "igrejas");
+                        // Use environment variables for Firebase config
+                        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                        if (!firebaseConfig?.apiKey) {
+                            return UI.showError("Configuração Incompleta", "As credenciais do Firebase não foram encontradas.");
+                        }
                         
-                        const auth = getAuth(firebaseApp);
-                        signInAnonymously(auth)
-                            .then(() => this.onReady())
-                            .catch(err => UI.showError("Erro de Autenticação", `Verifique os seus 'Domínios autorizados' no Firebase. Erro: ${err.message}`));
+                        const app = initializeApp(firebaseConfig);
+                        const auth = getAuth(app);
+                        state.db = getFirestore(app);
+
+                        // Use the provided App ID for the collection path
+                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                        state.igrejasCollectionRef = collection(state.db, `artifacts/${appId}/public/data/igrejas`);
+                        
+                        // Authenticate using the provided token or fall back to anonymous
+                        if (typeof __initial_auth_token !== 'undefined') {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                        this.onReady();
+
                     } catch (error) {
-                        UI.showError("Erro Crítico na Inicialização", `Verifique as credenciais. Detalhe: ${error.message}`);
+                         UI.showError("Erro Crítico na Inicialização", `Verifique as credenciais ou as regras de segurança. Detalhe: ${error.message}`);
                     }
                 },
 
@@ -207,7 +204,7 @@
                         this.filterAndRender();
                         UI.hideLoading();
                     }, (error) => {
-                        UI.showError("Erro de Permissão", `A sua base de dados bloqueou o acesso. Verifique as suas Regras de Segurança.`);
+                         UI.showError("Erro de Permissão", `A sua base de dados bloqueou o acesso. Verifique as suas Regras de Segurança no Firebase. Detalhes: ${error.message}`);
                     });
                 },
 
@@ -230,7 +227,7 @@
                 renderMarkers() {
                     state.map.eachLayer(layer => { if (layer instanceof L.Marker) state.map.removeLayer(layer); });
                     state.filteredChurches.forEach(church => {
-                        if (church.coords) {
+                        if (church.coords && church.coords.length === 2) {
                             const marker = L.marker(church.coords).addTo(state.map);
                             marker.on('click', () => this.selectChurch(church.id));
                         }
@@ -241,7 +238,9 @@
                     const church = state.allChurches.find(c => c.id === id);
                     if (church) {
                         state.selectedChurchId = id;
-                        state.map.setView(church.coords, 16);
+                        if (church.coords && church.coords.length === 2) {
+                           state.map.setView(church.coords, 16);
+                        }
                         UI.Modals.openDetails(church);
                     }
                 },
@@ -259,15 +258,15 @@
                     document.getElementById('neighborhood-filter').addEventListener('change', async (e) => {
                         const neighborhood = e.target.value;
                         const city = document.getElementById('city-filter').value;
-                        
-                        UI.updateFilters(); 
 
                         if (neighborhood && city) {
                             UI.showLoading('A localizar bairro...');
-                            const coords = await API.geocodeAddress(`${neighborhood}, ${city}, Santa Catarina`);
+                            const coords = await API.getBoundingBox(`${neighborhood}, ${city}, Santa Catarina, Brasil`);
                             UI.hideLoading();
                             if (coords) {
-                                state.map.setView([coords.lat, coords.lon], 15);
+                                state.map.fitBounds([[coords.minLat, coords.minLon], [coords.maxLat, coords.maxLon]]);
+                            } else {
+                                UI.showToast('Não foi possível localizar o bairro no mapa.', true);
                             }
                         }
                         this.filterAndRender();
@@ -280,21 +279,22 @@
                 }
             };
 
-            // --- MÓDULO DA UI E MODAIS ---
+            // --- UI AND MODALS MODULE ---
             const UI = {
-                showLoading: (message) => { document.getElementById('loading-overlay').classList.remove('hidden'); document.getElementById('loading-text').textContent = message; },
-                hideLoading: () => { state.isLoaded = true; clearTimeout(state.loadingTimeout); document.getElementById('loading-overlay').classList.add('hidden'); },
+                showLoading: (message) => { document.getElementById('loading-overlay').classList.remove('hidden'); document.getElementById('loading-overlay').style.display = 'flex'; document.getElementById('loading-text').textContent = message; },
+                hideLoading: () => { state.isLoaded = true; clearTimeout(state.loadingTimeout); document.getElementById('loading-overlay').style.display = 'none'; },
                 showError: (title, message, isTimeout = false) => {
                     clearTimeout(state.loadingTimeout);
                     const overlay = document.getElementById('loading-overlay');
                      if (isTimeout) {
-                        const authUrl = `https://console.firebase.google.com/project/${USER_FIREBASE_CONFIG.projectId}/authentication/settings`;
-                        message = `A aplicação demorou demasiado tempo a responder. Isto acontece quando o domínio do site não está autorizado.<br><br>
-                        <b>1. <a href="${authUrl}" target="_blank" class="text-sky-600 underline font-semibold">Clique aqui para abrir as configurações de autenticação.</a></b><br>
-                        2. Clique em "Adicionar domínio" e insira: <b>${window.location.hostname}</b>`;
+                         const projectId = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config).projectId : 'seu-projeto';
+                         const authUrl = `https://console.firebase.google.com/project/${projectId}/authentication/settings`;
+                         message = `A aplicação demorou demasiado tempo a responder. Isto acontece quando o domínio do site não está autorizado.<br><br>
+                         <b>1. <a href="${authUrl}" target="_blank" class="text-sky-600 underline font-semibold">Clique aqui para abrir as configurações de autenticação.</a></b><br>
+                         2. Clique em "Adicionar domínio" e insira: <b>${window.location.hostname}</b>`;
                     }
                     overlay.innerHTML = `<div class="text-center p-8 max-w-lg mx-auto bg-white rounded-lg shadow-xl border border-red-200"><i class="fa fa-times-circle text-6xl text-red-500"></i><h2 class="mt-4 text-2xl font-bold text-slate-800">${title}</h2><p class="mt-2 text-slate-600 text-left">${message}</p></div>`;
-                    overlay.classList.remove('hidden');
+                    overlay.style.display = 'flex';
                 },
                 renderChurchList: (churches) => {
                     const listEl = document.getElementById('church-list');
@@ -319,40 +319,38 @@
                     const cityFilter = document.getElementById('city-filter');
                     const neiFilter = document.getElementById('neighborhood-filter');
                     const selectedCity = cityFilter.value;
-                    const selectedNeighborhood = neiFilter.value;
 
-                    // Cidades
+                    // Populate cities only once
                     if (cityFilter.options.length <= 1) { 
-                         cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_SC).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+                        cityFilter.innerHTML = '<option value="">Todas as Cidades</option>' + Object.keys(CIDADES_SC).sort().map(c => `<option value="${c}">${c}</option>`).join('');
                     }
                     
-                    // Bairros
+                    // Update neighborhoods based on selected city
                     const neighborhoods = BAIRROS_POR_CIDADE[selectedCity] || [];
-                    neiFilter.innerHTML = '<option value="">Todos os Bairros</option>' + neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
-                    if (neighborhoods.includes(selectedNeighborhood)) {
-                        neiFilter.value = selectedNeighborhood;
-                    }
+                    neiFilter.innerHTML = '<option value="">Todos os Bairros</option>' + neighborhoods.sort().map(n => `<option value="${n}">${n}</option>`).join('');
                     neiFilter.disabled = !selectedCity;
                 },
                 showToast: (message, isError = false) => {
                     const toastContainer = document.getElementById('toast-container');
                     const toast = document.createElement('div');
-                    toast.className = `p-3 rounded-md shadow-md text-white fade-in ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+                    toast.className = `p-3 rounded-md shadow-lg text-white text-sm font-semibold fade-in ${isError ? 'bg-red-500' : 'bg-green-500'}`;
                     toast.textContent = message;
                     toastContainer.appendChild(toast);
-                    setTimeout(() => {
-                        toast.remove();
-                    }, 4000);
+                    setTimeout(() => { toast.remove(); }, 4000);
                 },
-                ProgressBar: { /* ... Omitido para brevidade ... */ },
                 Modals: {
                     _createModal(id, content, maxWidth = 'max-w-lg') {
+                        // Remove existing modal first to prevent duplicates
+                        document.getElementById(id)?.remove();
                         const modal = document.createElement('div');
                         modal.id = id;
-                        modal.className = 'fixed inset-0 bg-black/60 z-40 hidden items-center justify-center p-4 fade-in';
+                        modal.className = 'fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4 fade-in';
                         modal.innerHTML = `<div class="bg-white rounded-lg shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh]">${content}</div>`;
                         document.getElementById('modal-container').appendChild(modal);
-                        modal.querySelector('.close-modal-btn')?.addEventListener('click', () => modal.remove());
+                        
+                        const close = () => modal.remove();
+                        modal.querySelector('.close-modal-btn')?.addEventListener('click', close);
+                        modal.addEventListener('click', (e) => { if (e.target === modal) close(); }); // Close on backdrop click
                         return modal;
                     },
                     openDetails(church) {
@@ -368,47 +366,888 @@
                             </header>
                             <div class="p-4 custom-scrollbar overflow-y-auto">
                                 <div class="mb-4"><h4 class="font-semibold mb-2">Horários</h4>${scheduleHtml}</div>
-                                <div class="mb-4"><h4 class="font-semibold mb-2">Contacto</h4><p class="text-sm text-slate-600"><strong>Líder:</strong> ${church.leader || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Telefone:</strong> ${church.phone || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Website:</strong> ${church.website ? `<a href="${church.website}" target="_blank" class="text-sky-600 hover:underline">Visitar</a>` : 'Não informado'}</p></div>
+                                <div class="mb-4"><h4 class="font-semibold mb-2">Contacto</h4><p class="text-sm text-slate-600"><strong>Líder:</strong> ${church.leader || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Telefone:</strong> ${church.phone || 'Não informado'}</p><p class="text-sm text-slate-600"><strong>Website:</strong> ${church.website ? `<a href="${church.website.startsWith('http') ? '' : '//'}${church.website}" target="_blank" class="text-sky-600 hover:underline">Visitar</a>` : 'Não informado'}</p></div>
                             </div>
-                            <footer class="p-4 border-t flex gap-2">
+                            <footer class="p-4 border-t flex gap-2 no-print">
                                  <a href="https://www.google.com/maps/dir/?api=1&destination=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-sky-600 text-white font-semibold py-2 rounded-md hover:bg-sky-700 transition flex items-center justify-center gap-2"><i class="fa fa-route"></i> Rota</a>
                                  <a href="https://www.google.com/maps?q&layer=c&cbll=${church.coords[0]},${church.coords[1]}" target="_blank" class="flex-1 text-center bg-amber-500 text-white font-semibold py-2 rounded-md hover:bg-amber-600 transition flex items-center justify-center gap-2"><i class="fa fa-street-view"></i> Ver Rua</a>
                                  <button class="edit-btn flex-1 bg-slate-200 font-semibold py-2 rounded-md hover:bg-slate-300">Editar</button>
                             </footer>`;
                         const modal = this._createModal('details-modal', content);
-                        modal.classList.remove('hidden');
                         modal.querySelector('.edit-btn').addEventListener('click', () => { modal.remove(); this.openAddEdit(church); });
                     },
-                    openAddEdit(church = {}) { /* ... Omitido para brevidade ... */ },
+                    openAddEdit(church = {}) {
+                        const isEditing = !!church.id;
+                        let schedule = church.schedule || [{ day: '', startTime: '', endTime: '' }];
+                        const scheduleHtml = () => schedule.map((s, i) => `
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-2 items-center schedule-row">
+                                <select class="schedule-day md:col-span-2 bg-slate-100 rounded p-2 text-sm" required>${DIAS_SEMANA.map(d => `<option value="${d}" ${s.day === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
+                                <input type="time" class="schedule-start bg-slate-100 rounded p-2 text-sm" value="${s.startTime || ''}">
+                                <div class="flex items-center">
+                                    <input type="time" class="schedule-end bg-slate-100 rounded p-2 text-sm w-full" value="${s.endTime || ''}">
+                                    <button type="button" class="remove-schedule-btn ml-2 text-red-500 hover:text-red-700 ${schedule.length > 1 ? '' : 'hidden'}">&times;</button>
+                                </div>
+                            </div>`).join('');
+                        
+                        const content = `
+                            <header class="p-4 border-b"><h2 class="text-xl font-bold">${isEditing ? 'Editar' : 'Adicionar'} Igreja</h2></header>
+                            <form id="add-edit-form" class="flex-grow flex flex-col overflow-hidden">
+                                <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto custom-scrollbar">
+                                    <!-- Form fields -->
+                                    <input type="text" name="name" placeholder="Nome da Igreja" class="md:col-span-2 bg-slate-100 rounded p-2" value="${church.name || ''}" required>
+                                    <select name="denomination" class="bg-slate-100 rounded p-2">${DENOMINATIONS.map(d => `<option value="${d}" ${church.denomination === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
+                                    <input type="text" name="leader" placeholder="Líder/Pastor" class="bg-slate-100 rounded p-2" value="${church.leader || ''}">
+                                    <input type="text" name="phone" placeholder="Telefone" class="bg-slate-100 rounded p-2" value="${church.phone || ''}">
+                                    <input type="text" name="website" placeholder="Website" class="bg-slate-100 rounded p-2" value="${church.website || ''}">
+                                    
+                                    <div class="md:col-span-2">
+                                        <h4 class="font-semibold mb-2 text-sm">Horários</h4>
+                                        <div id="schedule-container" class="space-y-2">${scheduleHtml()}</div>
+                                        <button type="button" id="add-schedule-btn" class="mt-2 text-sm text-sky-600 font-semibold">+ Adicionar horário</button>
+                                    </div>
+
+                                    <div class="md:col-span-2">
+                                        <h4 class="font-semibold mb-2 text-sm">Localização</h4>
+                                        <input type="text" name="address" placeholder="Endereço Completo" class="w-full bg-slate-100 rounded p-2 mb-2" value="${church.address || ''}" required>
+                                        <div class="grid grid-cols-2 gap-2 mb-2">
+                                          <select name="city" class="bg-slate-100 rounded p-2" required>${Object.keys(CIDADES_SC).sort().map(c => `<option value="${c}" ${church.city === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+                                          <select name="neighborhood" class="bg-slate-100 rounded p-2" required>${(BAIRROS_POR_CIDADE[church.city] || []).sort().map(n => `<option value="${n}" ${church.neighborhood === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-2 items-center">
+                                            <input type="text" name="lat" placeholder="Latitude" class="bg-slate-100 rounded p-2" value="${church.coords ? church.coords[0] : ''}" required>
+                                            <input type="text" name="lon" placeholder="Longitude" class="bg-slate-100 rounded p-2" value="${church.coords ? church.coords[1] : ''}" required>
+                                            <button type="button" id="geocode-btn" class="bg-slate-200 h-full rounded hover:bg-slate-300 text-sm font-semibold">Obter <i class="fa fa-map-marker-alt"></i></button>
+                                        </div>
+                                        <div id="mini-map" class="h-40 w-full mt-2 rounded bg-slate-200"></div>
+                                    </div>
+                                </div>
+                                <footer class="p-4 border-t flex justify-end gap-2">
+                                    ${isEditing ? `<button type="button" id="delete-btn" class="mr-auto bg-red-500 text-white font-semibold py-2 px-4 rounded hover:bg-red-600">Apagar</button>` : ''}
+                                    <button type="button" class="close-modal-btn bg-slate-200 font-semibold py-2 px-4 rounded hover:bg-slate-300">Cancelar</button>
+                                    <button type="submit" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded hover:bg-sky-700">Salvar</button>
+                                </footer>
+                            </form>
+                        `;
+
+                        const modal = this._createModal('add-edit-modal', content, 'max-w-2xl');
+                        
+                        // Location Picker Map Logic
+                        const miniMap = L.map('mini-map').setView(church.coords || MAP_CENTER, church.coords ? 16 : 9);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+                        let marker = church.coords ? L.marker(church.coords).addTo(miniMap) : null;
+                        
+                        const updateMarker = (lat, lon) => {
+                            if(marker) marker.setLatLng([lat, lon]);
+                            else marker = L.marker([lat, lon]).addTo(miniMap);
+                            miniMap.setView([lat, lon], 16);
+                        };
+
+                        miniMap.on('click', (e) => {
+                            modal.querySelector('input[name="lat"]').value = e.latlng.lat.toFixed(6);
+                            modal.querySelector('input[name="lon"]').value = e.latlng.lng.toFixed(6);
+                            updateMarker(e.latlng.lat, e.latlng.lng);
+                        });
+
+                        // Dynamic Neighborhoods
+                        modal.querySelector('select[name="city"]').addEventListener('change', (e) => {
+                            const city = e.target.value;
+                            const neighborhoodSelect = modal.querySelector('select[name="neighborhood"]');
+                            neighborhoodSelect.innerHTML = (BAIRROS_POR_CIDADE[city] || []).sort().map(n => `<option value="${n}">${n}</option>`).join('');
+                        });
+
+                        // Schedule Logic
+                        const scheduleContainer = modal.querySelector('#schedule-container');
+                        const addScheduleRow = () => {
+                            schedule.push({ day: 'Domingo', startTime: '', endTime: '' });
+                            scheduleContainer.innerHTML = scheduleHtml();
+                            updateRemoveButtons();
+                        };
+                        const updateRemoveButtons = () => {
+                             modal.querySelectorAll('.remove-schedule-btn').forEach((btn, i) => {
+                                btn.classList.toggle('hidden', schedule.length <= 1);
+                                btn.onclick = () => {
+                                    schedule.splice(i, 1);
+                                    scheduleContainer.innerHTML = scheduleHtml();
+                                    updateRemoveButtons();
+                                }
+                            });
+                        }
+                        modal.querySelector('#add-schedule-btn').addEventListener('click', addScheduleRow);
+                        updateRemoveButtons();
+
+
+                        // Geocode Button
+                        modal.querySelector('#geocode-btn').addEventListener('click', async (e) => {
+                           const button = e.currentTarget;
+                           button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+                           const address = modal.querySelector('input[name="address"]').value;
+                           const city = modal.querySelector('select[name="city"]').value;
+                           if(!address || !city) {
+                               UI.showToast('Preencha o endereço e a cidade.', true);
+                               button.innerHTML = 'Obter <i class="fa fa-map-marker-alt"></i>';
+                               return;
+                           }
+                           const fullAddress = `${address}, ${city}, Santa Catarina, Brasil`;
+                           const result = await API.getBoundingBox(fullAddress, true);
+                           if (result) {
+                               modal.querySelector('input[name="lat"]').value = result.lat;
+                               modal.querySelector('input[name="lon"]').value = result.lon;
+                               updateMarker(result.lat, result.lon);
+                           } else {
+                               UI.showToast('Endereço não encontrado.', true);
+                           }
+                           button.innerHTML = 'Obter <i class="fa fa-map-marker-alt"></i>';
+                        });
+
+                        // Form Submission
+                        modal.querySelector('#add-edit-form').addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target);
+                            const data = Object.fromEntries(formData.entries());
+                            data.coords = [parseFloat(data.lat), parseFloat(data.lon)];
+                            data.schedule = Array.from(scheduleContainer.querySelectorAll('.schedule-row')).map(row => ({
+                                day: row.querySelector('.schedule-day').value,
+                                startTime: row.querySelector('.schedule-start').value,
+                                endTime: row.querySelector('.schedule-end').value
+                            })).filter(s => s.day && s.startTime);
+                            
+                            delete data.lat; delete data.lon;
+
+                            try {
+                                if (isEditing) {
+                                    await setDoc(doc(state.db, state.igrejasCollectionRef.path, church.id), data);
+                                    UI.showToast('Igreja atualizada com sucesso!');
+                                } else {
+                                    await addDoc(state.igrejasCollectionRef, data);
+                                    UI.showToast('Igreja adicionada com sucesso!');
+                                }
+                                modal.remove();
+                            } catch (error) {
+                                UI.showToast(`Erro ao salvar: ${error.message}`, true);
+                            }
+                        });
+
+                        // Delete Button
+                         if(isEditing) {
+                            modal.querySelector('#delete-btn').addEventListener('click', () => {
+                                this.openConfirm({
+                                    title: 'Confirmar Exclusão',
+                                    message: `Tem certeza que deseja apagar permanentemente a igreja "${church.name}"? Esta ação não pode ser desfeita.`,
+                                    onConfirm: async () => {
+                                        try {
+                                            await deleteDoc(doc(state.db, state.igrejasCollectionRef.path, church.id));
+                                            UI.showToast('Igreja apagada com sucesso.');
+                                            modal.remove();
+                                        } catch(e) { UI.showToast(`Erro ao apagar: ${e.message}`, true) }
+                                    }
+                                });
+                            });
+                        }
+                    },
                     openAdmin() {
                         const content = `
                             <header class="p-4 border-b flex justify-between items-center"><h2 class="text-xl font-bold">Ferramentas Administrativas</h2><button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button></header>
                             <div class="p-4 space-y-3">
                                 <button id="report-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Relatório de Denominações</button>
                                 <button id="import-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Assistente de Importação</button>
+                                <h3 class="font-semibold text-slate-700 pt-2">Manutenção de Dados</h3>
+                                <button id="update-neighborhoods-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Atualizar Bairros das Igrejas</button>
                                 <button id="cleanup-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition">Limpar Locais Fora de SC</button>
                                 <button id="clear-all-btn" class="w-full text-left p-3 rounded-md bg-red-50 text-red-700 hover:bg-red-100 transition">Apagar TODA a Base de Dados</button>
                                 <button id="test-connection-btn" class="w-full text-left p-3 rounded-md bg-slate-100 hover:bg-slate-200 transition mt-4">Testar Ligação</button>
                             </div>`;
                         const modal = this._createModal('admin-modal', content, 'max-w-md');
-                        modal.classList.remove('hidden');
+                        
                         modal.querySelector('#report-btn').addEventListener('click', () => { modal.remove(); this.openReport(); });
                         modal.querySelector('#import-btn').addEventListener('click', () => { modal.remove(); this.openImportAssistant(); });
-                        modal.querySelector('#cleanup-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'cleanup' }); });
-                        modal.querySelector('#clear-all-btn').addEventListener('click', () => { modal.remove(); this.openConfirm({ action: 'clearAll' }); });
-                        modal.querySelector('#test-connection-btn').addEventListener('click', async () => { UI.showLoading('A testar...'); try { await getDocs(query(state.igrejasCollectionRef, limit(1))); UI.showToast('Ligação com Firebase OK!'); } catch(e) { UI.showToast(`Falha na ligação: ${e.message}`, true); } finally { UI.hideLoading(); }});
+                        modal.querySelector('#update-neighborhoods-btn').addEventListener('click', () => {
+                            modal.remove();
+                            this.openConfirm({
+                                title: 'Atualizar Bairros',
+                                message: 'Esta ação irá analisar todas as igrejas sem bairro e tentar encontrar o bairro correto usando as suas coordenadas. Isto irá corrigir o filtro de bairros da barra lateral. O processo pode demorar vários minutos. Deseja continuar?',
+                                onConfirm: () => Admin.updateNeighborhoods()
+                            });
+                        });
+                        modal.querySelector('#cleanup-btn').addEventListener('click', () => { 
+                             modal.remove();
+                             this.openConfirm({
+                                 title: 'Limpar Locais Fora de SC',
+                                 message: 'Esta ação irá verificar todas as igrejas e apagar aquelas cujas coordenadas estão fora dos limites de Santa Catarina. Deseja continuar?',
+                                 onConfirm: () => Admin.cleanupOutsideSC()
+                             });
+                        });
+                        modal.querySelector('#clear-all-btn').addEventListener('click', () => {
+                            modal.remove();
+                             this.openConfirm({
+                                 title: 'APAGAR TUDO?',
+                                 message: 'ATENÇÃO: Esta ação irá apagar permanentemente TODAS as igrejas da base de dados. Esta ação não pode ser desfeita. Digite "APAGAR" para confirmar.',
+                                 onConfirm: () => Admin.clearAllData(),
+                                 prompt: 'APAGAR'
+                             });
+                        });
+                        modal.querySelector('#test-connection-btn').addEventListener('click', async (e) => { 
+                            const btn = e.currentTarget;
+                            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> A testar...';
+                            try { 
+                                await getDocs(query(state.igrejasCollectionRef, limit(1))); 
+                                UI.showToast('Ligação com Firebase OK!'); 
+                            } catch(e) { 
+                                UI.showToast(`Falha na ligação: ${e.message}`, true); 
+                            } finally {
+                                btn.innerHTML = 'Testar Ligação';
+                            }
+                        });
                     },
-                    openConfirm({ action }) { /* ... Omitido para brevidade ... */ },
-                    openImportAssistant() { /* ... Omitido para brevidade ... */ },
-                    openReport() { /* ... Omitido para brevidade ... */ }
+                    openConfirm({ title, message, onConfirm, prompt = null }) {
+                         const content = `
+                            <div class="p-6">
+                                <h2 class="text-xl font-bold text-slate-800">${title}</h2>
+                                <p class="mt-2 text-slate-600">${message}</p>
+                                ${prompt ? `<input type="text" id="confirm-prompt" class="mt-4 w-full bg-slate-100 border border-slate-300 rounded p-2" placeholder="Digite '${prompt}' aqui">` : ''}
+                            </div>
+                            <footer class="p-4 bg-slate-50 flex justify-end gap-2">
+                                <button class="close-modal-btn bg-slate-200 font-semibold py-2 px-4 rounded hover:bg-slate-300">Cancelar</button>
+                                <button id="confirm-action-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded hover:bg-red-600 ${prompt ? 'opacity-50 cursor-not-allowed' : ''}" ${prompt ? 'disabled' : ''}>Confirmar</button>
+                            </footer>
+                        `;
+                        const modal = this._createModal('confirm-modal', content, 'max-w-md');
+                        const confirmBtn = modal.querySelector('#confirm-action-btn');
+
+                        if (prompt) {
+                            const promptInput = modal.querySelector('#confirm-prompt');
+                            promptInput.addEventListener('input', () => {
+                                if (promptInput.value === prompt) {
+                                    confirmBtn.disabled = false;
+                                    confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                                } else {
+                                    confirmBtn.disabled = true;
+                                    confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                                }
+                            });
+                        }
+
+                        confirmBtn.addEventListener('click', () => {
+                            modal.remove();
+                            onConfirm();
+                        });
+                    },
+                    openImportAssistant() {
+                        const content = `
+                            <header class="p-4 border-b flex justify-between items-center">
+                                <h2 class="text-xl font-bold">Assistente de Importação</h2>
+                                <button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button>
+                            </header>
+                            
+                            <div class="border-b border-slate-200">
+                                <nav class="flex -mb-px">
+                                    <button data-tab="manual" class="tab-btn active flex-1 p-3 text-sm font-semibold border-b-2">Manual</button>
+                                    <button data-tab="auto" class="tab-btn flex-1 p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Automático</button>
+                                    <button data-tab="smart" class="tab-btn flex-1 p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Busca Inteligente</button>
+                                </nav>
+                            </div>
+
+                            <div id="import-manual-content" class="p-4 space-y-4 tab-content">
+                                <p class="text-sm text-slate-600">Cole aqui os dados no formato CSV (separado por vírgulas) ou JSON. O cabeçalho é obrigatório. Campos essenciais: <code class="bg-slate-100 p-1 rounded text-xs">name</code>, <code class="bg-slate-100 p-1 rounded text-xs">address</code>, <code class="bg-slate-100 p-1 rounded text-xs">city</code>.</p>
+                                <textarea id="import-data-manual" class="w-full h-48 bg-slate-100 rounded p-2 font-mono text-xs" placeholder="name,address,city,leader...\nIgreja Exemplo,Rua Principal 123,Blumenau,Pastor João..."></textarea>
+                                <div id="import-progress-manual" class="hidden w-full bg-slate-200 rounded-full h-2.5"><div class="bg-sky-600 h-2.5 rounded-full" style="width: 0%"></div></div>
+                                <p id="import-status-manual" class="text-sm text-slate-500 text-center"></p>
+                            </div>
+
+                             <div id="import-auto-content" class="p-4 space-y-4 tab-content hidden">
+                                <p class="text-sm text-slate-600">Selecione uma cidade para fazer uma busca por locais de culto registados no mapa.</p>
+                                <div class="flex gap-2">
+                                     <select class="import-city-select w-full bg-slate-100 rounded p-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                        <option value="Blumenau">Blumenau</option>
+                                        ${Object.keys(CIDADES_SC).filter(c=>c!=="Blumenau").sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <button class="find-in-area-btn w-full mt-2 bg-sky-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-sky-700 transition">Buscar em <span class="search-area-name">Blumenau</span></button>
+                                <div class="results-container max-h-60 overflow-y-auto custom-scrollbar border rounded-md mt-4"></div>
+                            </div>
+                            
+                             <div id="import-smart-content" class="p-4 space-y-4 tab-content hidden">
+                                <p class="text-sm text-slate-600">Faça uma busca profunda por palavras-chave (Igreja, Templo, etc.) para encontrar locais não catalogados.</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                     <select class="import-city-select col-span-2 md:col-span-1 bg-slate-100 rounded p-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                        <option value="Blumenau">Blumenau</option>
+                                        ${Object.keys(CIDADES_SC).filter(c=>c!=="Blumenau").sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+                                     </select>
+                                     <select class="import-neighborhood-select col-span-2 md:col-span-1 bg-slate-100 rounded p-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                        <option value="">Todos os Bairros</option>
+                                        ${BAIRROS_POR_CIDADE["Blumenau"].sort().map(n => `<option value="${n}">${n}</option>`).join('')}
+                                     </select>
+                                </div>
+                                <button class="find-in-area-btn w-full mt-2 bg-sky-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-sky-700 transition">Buscar em <span class="search-area-name">Blumenau</span></button>
+                                <div class="results-container max-h-60 overflow-y-auto custom-scrollbar border rounded-md mt-4"></div>
+                            </div>
+                            
+                            <footer class="p-4 border-t flex justify-end gap-2">
+                                <button type="button" class="close-modal-btn bg-slate-200 font-semibold py-2 px-4 rounded hover:bg-slate-300">Fechar</button>
+                                <button id="start-import-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded hover:bg-sky-700">Iniciar Importação</button>
+                            </footer>
+                        `;
+                        const modal = this._createModal('import-modal', content, 'max-w-xl');
+
+                        const tabs = modal.querySelectorAll('.tab-btn');
+                        const contents = modal.querySelectorAll('.tab-content');
+                        const importBtn = modal.querySelector('#start-import-btn');
+
+                        tabs.forEach(tab => {
+                            tab.addEventListener('click', () => {
+                                tabs.forEach(t => t.classList.remove('active'));
+                                tab.classList.add('active');
+                                const target = tab.dataset.tab;
+                                contents.forEach(c => {
+                                    c.classList.toggle('hidden', !c.id.startsWith(`import-${target}-content`));
+                                });
+                                
+                                const activeContent = modal.querySelector(`#import-${target}-content`);
+                                const resultsContainer = activeContent.querySelector('.results-container');
+
+                                if (target === 'manual') {
+                                    importBtn.textContent = 'Iniciar Importação';
+                                    importBtn.disabled = false;
+                                } else {
+                                    importBtn.textContent = 'Importar Selecionadas';
+                                    importBtn.disabled = !resultsContainer || resultsContainer.children.length === 0 || resultsContainer.querySelector('.import-checkbox') === null;
+                                }
+                            });
+                        });
+                        
+                        // Event listeners for import modal
+                        modal.querySelectorAll('.import-city-select').forEach(select => {
+                            select.addEventListener('change', (e) => {
+                                const city = e.target.value;
+                                const parentContent = e.target.closest('.tab-content');
+                                const neighborhoodSelect = parentContent.querySelector('.import-neighborhood-select');
+                                const searchBtn = parentContent.querySelector('.find-in-area-btn');
+                                const areaNameSpan = searchBtn.querySelector('.search-area-name');
+
+                                if (neighborhoodSelect) {
+                                    const neighborhoods = BAIRROS_POR_CIDADE[city] || [];
+                                    neighborhoodSelect.innerHTML = '<option value="">Todos os Bairros</option>' + neighborhoods.sort().map(n => `<option value="${n}">${n}</option>`).join('');
+                                    neighborhoodSelect.disabled = neighborhoods.length === 0;
+                                }
+                                if (areaNameSpan) areaNameSpan.textContent = city;
+                            });
+                        });
+
+                        modal.querySelectorAll('.import-neighborhood-select').forEach(select => {
+                            select.addEventListener('change', (e) => {
+                                 const neighborhood = e.target.value;
+                                 const parentContent = e.target.closest('.tab-content');
+                                 const city = parentContent.querySelector('.import-city-select').value;
+                                 const searchBtn = parentContent.querySelector('.find-in-area-btn');
+                                 const areaNameSpan = searchBtn.querySelector('.search-area-name');
+                                 if (areaNameSpan) {
+                                     areaNameSpan.textContent = neighborhood ? `${neighborhood}, ${city}` : city;
+                                 }
+                            });
+                        });
+                        
+                        importBtn.addEventListener('click', async (e) => {
+                            const button = e.currentTarget;
+                            const originalText = button.textContent;
+                            const activeTab = modal.querySelector('.tab-btn.active').dataset.tab;
+                            
+                            button.disabled = true;
+                            button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> A importar...';
+
+                            let success = false;
+                            if (activeTab === 'manual') {
+                                const data = modal.querySelector('#import-data-manual').value;
+                                success = await Admin.importDataManual(data);
+                            } else { // Handles both 'auto' and 'smart'
+                                const activeContent = modal.querySelector(`#import-${activeTab}-content`);
+                                success = await Admin.importDataAuto(activeContent);
+                            }
+
+                            if (success) {
+                                modal.remove();
+                            } else {
+                                button.disabled = false;
+                                button.innerHTML = originalText;
+                            }
+                        });
+
+                        modal.querySelectorAll('.find-in-area-btn').forEach(btn => {
+                            btn.addEventListener('click', async (e) => {
+                                const button = e.currentTarget;
+                                const parentContent = button.closest('.tab-content');
+                                const cityName = parentContent.querySelector('.import-city-select').value;
+                                const neighborhoodName = parentContent.querySelector('.import-neighborhood-select')?.value || '';
+                                const activeTab = modal.querySelector('.tab-btn.active').dataset.tab;
+
+                                if (!cityName) {
+                                    UI.showToast('Por favor, selecione uma cidade para buscar.', true);
+                                    return;
+                                }
+                                button.disabled = true;
+                                button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+                                
+                                const hasResults = await Admin.findChurchesInArea(parentContent, cityName, neighborhoodName, (activeTab === 'smart'));
+                                
+                                importBtn.disabled = !hasResults;
+
+                                button.disabled = false;
+                                button.innerHTML = `Buscar em <span class="search-area-name">${neighborhoodName ? `${neighborhoodName}, ${cityName}` : cityName}</span>`;
+                            });
+                        });
+
+                    },
+                    openReport() {
+                        const counts = state.allChurches.reduce((acc, church) => {
+                            const den = church.denomination || 'Não especificada';
+                            acc[den] = (acc[den] || 0) + 1;
+                            return acc;
+                        }, {});
+
+                        const sortedCounts = Object.entries(counts).sort(([,a],[,b]) => b-a);
+                        
+                        const reportContent = `
+                            <div id="printable-report">
+                                <h2 class="text-2xl font-bold mb-4">Relatório de Denominações</h2>
+                                <p class="mb-4 text-slate-600">Total de locais: ${state.allChurches.length}</p>
+                                <table class="w-full text-left border-collapse">
+                                    <thead><tr><th class="p-2 border-b-2">Denominação</th><th class="p-2 border-b-2 text-right">Quantidade</th></tr></thead>
+                                    <tbody>${sortedCounts.map(([den, count]) => `<tr><td class="p-2 border-b">${den}</td><td class="p-2 border-b text-right">${count}</td></tr>`).join('')}</tbody>
+                                </table>
+                            </div>
+                        `;
+
+                        const modalContent = `
+                            <header class="p-4 border-b flex justify-between items-center"><h2 class="text-xl font-bold">Relatório</h2><button class="close-modal-btn text-2xl text-slate-400 hover:text-slate-800">&times;</button></header>
+                            <div class="p-4">${reportContent}</div>
+                            <footer class="p-4 border-t flex justify-end no-print">
+                                <button id="print-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded hover:bg-sky-700">Imprimir</button>
+                            </footer>
+                        `;
+                        const modal = this._createModal('report-modal', modalContent);
+                        modal.querySelector('#print-btn').addEventListener('click', () => window.print());
+                    }
                 }
             };
             
-            // --- MÓDULO DE ADMINISTRAÇÃO E API ---
-            const Admin = { /* ... Omitido para brevidade ... */ };
-            const API = { /* ... Omitido para brevidade ... */ };
+            // --- ADMINISTRATION AND API MODULE ---
+            const Admin = {
+                 _findBestNeighborhoodMatch(apiNeighborhood, cityNeighborhoods) {
+                    if (!apiNeighborhood || !cityNeighborhoods || cityNeighborhoods.length === 0) {
+                        return null;
+                    }
+                    const normalizedApiName = apiNeighborhood.toLowerCase().trim();
+                    // Exact match first
+                    for (const canonicalName of cityNeighborhoods) {
+                        if (canonicalName.toLowerCase().trim() === normalizedApiName) {
+                            return canonicalName;
+                        }
+                    }
+                    // Then, check if the API name contains a canonical name
+                    for (const canonicalName of cityNeighborhoods) {
+                        if (normalizedApiName.includes(canonicalName.toLowerCase().trim())) {
+                            return canonicalName;
+                        }
+                    }
+                    // Then, check if a canonical name contains the API name
+                    for (const canonicalName of cityNeighborhoods) {
+                        if (canonicalName.toLowerCase().trim().includes(normalizedApiName)) {
+                            return canonicalName;
+                        }
+                    }
+                    return null; // No good match found
+                },
+                async cleanupOutsideSC() {
+                    UI.showLoading('A verificar locais...');
+                    const toDelete = state.allChurches.filter(c => {
+                        if (!c.coords || c.coords.length !== 2) return true; // Delete if no coords
+                        const [lat, lon] = c.coords;
+                        return lat > SANTA_CATARINA_BOUNDS.maxLat || lat < SANTA_CATARINA_BOUNDS.minLat || lon > SANTA_CATARINA_BOUNDS.maxLon || lon < SANTA_CATARINA_BOUNDS.minLon;
+                    });
+                    
+                    if (toDelete.length === 0) {
+                        UI.hideLoading();
+                        UI.showToast('Nenhum local fora de SC encontrado.');
+                        return;
+                    }
+
+                    const batch = writeBatch(state.db);
+                    toDelete.forEach(church => {
+                        batch.delete(doc(state.db, state.igrejasCollectionRef.path, church.id));
+                    });
+
+                    try {
+                        await batch.commit();
+                        UI.hideLoading();
+                        UI.showToast(`${toDelete.length} locais fora de SC foram apagados.`);
+                    } catch (error) {
+                        UI.hideLoading();
+                        UI.showToast(`Erro ao limpar: ${error.message}`, true);
+                    }
+                },
+                async clearAllData() {
+                     UI.showLoading('A apagar todos os dados...');
+                     const snapshot = await getDocs(state.igrejasCollectionRef);
+                     if (snapshot.empty) {
+                         UI.hideLoading();
+                         UI.showToast('A base de dados já está vazia.');
+                         return;
+                     }
+                     const batch = writeBatch(state.db);
+                     snapshot.docs.forEach(d => batch.delete(d.ref));
+                     try {
+                         await batch.commit();
+                         UI.hideLoading();
+                         UI.showToast('Todos os dados foram apagados com sucesso!');
+                     } catch(error) {
+                         UI.hideLoading();
+                         UI.showToast(`Erro ao apagar: ${error.message}`, true);
+                     }
+                },
+                async updateNeighborhoods() {
+                    UI.showLoading('A verificar igrejas sem bairro...');
+                    const churchesToUpdate = state.allChurches.filter(c => !c.neighborhood && c.coords && c.coords.length === 2 && c.city && BAIRROS_POR_CIDADE[c.city]);
+                    
+                    if (churchesToUpdate.length === 0) {
+                        UI.hideLoading();
+                        UI.showToast('Todos os locais já possuem informação de bairro válida.');
+                        return;
+                    }
+
+                    let updatedCount = 0;
+                    let failedCount = 0;
+                    const total = churchesToUpdate.length;
+                    let batch = writeBatch(state.db);
+                    let operationCount = 0;
+
+                    for (let i = 0; i < total; i++) {
+                        const church = churchesToUpdate[i];
+                        UI.showLoading(`A processar ${i + 1} de ${total}: ${church.name}`);
+                        
+                        try {
+                            // Respect Nominatim's usage policy (1 req/sec)
+                            await new Promise(resolve => setTimeout(resolve, 1100)); 
+                            
+                            const apiNeighborhood = await API.reverseGeocode(church.coords[0], church.coords[1]);
+                            
+                            if (apiNeighborhood) {
+                                const canonicalNeighborhoods = BAIRROS_POR_CIDADE[church.city];
+                                const bestMatch = this._findBestNeighborhoodMatch(apiNeighborhood, canonicalNeighborhoods);
+
+                                if (bestMatch) {
+                                    const churchRef = doc(state.db, state.igrejasCollectionRef.path, church.id);
+                                    batch.update(churchRef, { neighborhood: bestMatch });
+                                    operationCount++;
+                                    updatedCount++;
+                                } else {
+                                     failedCount++;
+                                     console.warn(`Nenhum bairro correspondente encontrado para "${apiNeighborhood}" em ${church.city} para a igreja "${church.name}".`);
+                                }
+                            } else {
+                                failedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`Falha ao atualizar bairro para ${church.name}:`, error);
+                            failedCount++;
+                        }
+
+                        // Commit the batch every 400 operations or on the last item
+                        if (operationCount >= 400 || (i === total - 1 && operationCount > 0)) {
+                            await batch.commit();
+                            batch = writeBatch(state.db); // Start a new batch
+                            operationCount = 0;
+                        }
+                    }
+
+                    UI.hideLoading();
+                    UI.showToast(`${updatedCount} bairros atualizados. ${failedCount} falharam ou não foram encontrados.`);
+                },
+                async importDataManual(data) {
+                    const statusEl = document.getElementById('import-status-manual');
+                    const progressEl = document.getElementById('import-progress-manual')?.querySelector('div');
+                    if (progressEl) progressEl.parentElement.classList.remove('hidden');
+
+                    const updateProgress = (i, total, message) => {
+                        if (statusEl) statusEl.textContent = `Processando ${i} de ${total}: ${message}`;
+                        if(progressEl) progressEl.style.width = `${(i/total) * 100}%`;
+                    };
+
+                    try {
+                        let records = [];
+                        if (data.trim().startsWith('{') || data.trim().startsWith('[')) {
+                            records = JSON.parse(data);
+                        } else {
+                            const lines = data.trim().split('\n');
+                            const headers = lines.shift().split(',').map(h => h.trim());
+                            records = lines.map(line => {
+                                const values = line.split(',');
+                                return headers.reduce((obj, header, index) => {
+                                    obj[header] = values[index]?.trim();
+                                    return obj;
+                                }, {});
+                            });
+                        }
+                        
+                        if (records.length === 0) throw new Error("Nenhum registo para importar.");
+
+                        const batch = writeBatch(state.db);
+                        let i = 0;
+                        let importedCount = 0;
+                        for(const record of records) {
+                            i++;
+                            if (!record.name || !record.address || !record.city) {
+                                updateProgress(i, records.length, `Saltando ${record.name || 'registo sem nome'} (dados em falta)`);
+                                continue;
+                            }
+                            
+                            updateProgress(i, records.length, `A geolocalizar ${record.name}`);
+                            const fullAddress = `${record.address}, ${record.city}, Santa Catarina`;
+                            const result = await API.getBoundingBox(fullAddress, true);
+                            
+                            if (result) {
+                                record.coords = [result.lat, result.lon];
+                            } else {
+                                updateProgress(i, records.length, `Coordenadas não encontradas para ${record.name}`);
+                                continue;
+                            }
+                            
+                            const newDocRef = doc(collection(state.db, state.igrejasCollectionRef.path));
+                            batch.set(newDocRef, record);
+                            importedCount++;
+                        }
+
+                        updateProgress(records.length, records.length, 'A guardar na base de dados...');
+                        await batch.commit();
+                        UI.showToast(`${importedCount} registos importados com sucesso!`);
+                        return true;
+                    } catch (error) {
+                        UI.showToast(`Erro na importação: ${error.message}`, true);
+                        if (statusEl) statusEl.textContent = `Erro: ${error.message}`;
+                        return false;
+                    }
+                },
+                 _inferDenomination(name) {
+                    const lowerName = name.toLowerCase();
+                    if (lowerName.includes('católica') || lowerName.includes('paróquia') || lowerName.includes('nossa senhora') || lowerName.startsWith('são ') || lowerName.startsWith('santa ')) return 'Católica';
+                    if (lowerName.includes('luterana')) return 'Luterana';
+                    if (lowerName.includes('batista')) return 'Batista';
+                    if (lowerName.includes('assembleia de deus')) return 'Assembleia de Deus';
+                    if (lowerName.includes('evang') || lowerName.includes('universal') || lowerName.includes('mundial') || lowerName.includes('quadrangular') || lowerName.includes('pentecostal')) return 'Outra Evangélica';
+                    return 'Outra';
+                },
+                async findChurchesInArea(modalContent, cityName, neighborhoodName, isSmart) {
+                    const resultsContainer = modalContent.querySelector('.results-container');
+                    let areaQuery = `${cityName}, Santa Catarina, Brasil`;
+                    let areaDisplayName = cityName;
+                    if (neighborhoodName) {
+                        areaQuery = `${neighborhoodName}, ${areaQuery}`;
+                        areaDisplayName = `${neighborhoodName}, ${cityName}`;
+                    }
+                    
+                    resultsContainer.innerHTML = `<p class="p-4 text-center text-slate-500">A obter limites de ${areaDisplayName}...</p>`;
+
+                    const bounds = await API.getBoundingBox(areaQuery);
+
+                    if (!bounds) {
+                        UI.showToast(`Não foi possível encontrar os limites geográficos para ${areaDisplayName}.`, true);
+                        resultsContainer.innerHTML = `<p class="p-4 text-center text-red-500">Localização não encontrada.</p>`;
+                        return false;
+                    }
+                    const bboxString = `${bounds.minLat},${bounds.minLon},${bounds.maxLat},${bounds.maxLon}`;
+
+                    resultsContainer.innerHTML = `<p class="p-4 text-center text-slate-500">A procurar locais de culto em ${areaDisplayName}... (Isto pode demorar um pouco)</p>`;
+                    
+                    const smartKeywords = "[Ii]greja|[Pp]aróquia|[Cc]apela|[Tt]emplo|[Ee]vangélica|[Cc]omunidade|[Mm]inistério|[Ss]alão do [Rr]eino|[Aa]dventista|[Mm]etodista|[Pp]resbiteriana|[Bb]atista|[Aa]ssembleia|[Uu]niversal|[Mm]undial|[Dd]eus é [Aa]mor|[Cc]ristã|[Cc]atedral|[Bb]asílica|[Ss]antuário";
+                    const query = isSmart
+                        ? `[out:json][timeout:120];(
+                            node["amenity"="place_of_worship"](${bboxString});
+                            way["amenity"="place_of_worship"](${bboxString});
+                            node["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
+                            way["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
+                            node["name"~"${smartKeywords}"](${bboxString});
+                            way["name"~"${smartKeywords}"](${bboxString});
+                          ); out center;`
+                        : `[out:json][timeout:30];(
+                            node["amenity"="place_of_worship"](${bboxString});
+                            way["amenity"="place_of_worship"](${bboxString});
+                          ); out center;`;
+                    
+                    const results = await API.getPlacesFromOverpass(query);
+
+                    if (results.length === 0) {
+                        resultsContainer.innerHTML = `<p class="p-4 text-center text-slate-500">Nenhum local de culto encontrado nos dados do mapa para ${areaDisplayName}.</p>`;
+                        return false;
+                    }
+                    
+                    const uniqueResults = new Map();
+                    results.forEach(item => { if (item.tags?.name) uniqueResults.set(item.id, item); });
+
+                    const newChurches = [];
+                    const alreadyInDbChurches = [];
+
+                    for (const apiChurch of uniqueResults.values()) {
+                        const coords = apiChurch.type === 'node' 
+                            ? { lat: apiChurch.lat, lon: apiChurch.lon } 
+                            : (apiChurch.center ? { lat: apiChurch.center.lat, lon: apiChurch.center.lon } : null);
+                        
+                        if (!coords) continue;
+
+                        const isDuplicate = state.allChurches.some(dbChurch => {
+                            if (!dbChurch.coords || dbChurch.coords.length !== 2) return false;
+                            return API.haversineDistance(coords, { lat: dbChurch.coords[0], lon: dbChurch.coords[1] }) < 0.1; // 100m threshold
+                        });
+
+                        if (isDuplicate) {
+                            alreadyInDbChurches.push(apiChurch);
+                        } else {
+                            newChurches.push(apiChurch);
+                        }
+                    }
+
+                    if (newChurches.length === 0 && alreadyInDbChurches.length === 0) {
+                        resultsContainer.innerHTML = `<p class="p-4 text-center text-slate-500">Nenhum local de culto encontrado nos dados do mapa para ${areaDisplayName}.</p>`;
+                        return false;
+                    }
+                    
+                    let html = '';
+
+                    if (newChurches.length > 0) {
+                        html += newChurches.map(church => {
+                            const coords = church.type === 'node' ? { lat: church.lat, lon: church.lon } : { lat: church.center.lat, lon: church.center.lon };
+                            const name = church.tags.name;
+                            const street = church.tags['addr:street'] || '';
+                            const housenumber = church.tags['addr:housenumber'] || '';
+                            const neighborhoodFromAPI = church.tags['addr:suburb'] || '';
+                            let address = [street, housenumber, neighborhoodName || neighborhoodFromAPI].filter(Boolean).join(', ');
+                            if (!address) address = `${cityName} - SC`;
+
+                            const denomination = this._inferDenomination(name);
+                            const churchData = { 
+                                name, 
+                                address, 
+                                city: cityName, 
+                                neighborhood: neighborhoodName || neighborhoodFromAPI, 
+                                coords: [coords.lat, coords.lon], 
+                                denomination 
+                            };
+                            const churchDataJSON = JSON.stringify(churchData).replace(/'/g, "&apos;");
+
+                            return `
+                                <div class="flex items-start p-3 border-b border-slate-100 hover:bg-slate-50">
+                                    <input type="checkbox" class="import-checkbox mt-1 h-4 w-4" data-church='${churchDataJSON}' checked>
+                                    <label class="ml-3 text-sm">
+                                        <strong class="block">${name}</strong>
+                                        <span class="text-slate-500">${address} <span class="text-xs font-semibold text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded-full">${denomination}</span></span>
+                                    </label>
+                                </div>`;
+                        }).join('');
+                    } else {
+                        html += `<p class="p-4 text-center text-slate-500">Nenhum local <strong>novo</strong> encontrado.</p>`;
+                    }
+
+                    if (alreadyInDbChurches.length > 0) {
+                        html += `<h4 class="p-2 font-semibold text-slate-600 bg-slate-100 text-sm sticky top-0">Encontrados ${alreadyInDbChurches.length} locais já existentes (não serão importados):</h4>`;
+                        html += alreadyInDbChurches.map(church => {
+                            const name = church.tags.name;
+                            const street = church.tags['addr:street'] || '';
+                            const housenumber = church.tags['addr:housenumber'] || '';
+                            const neighborhoodFromAPI = church.tags['addr:suburb'] || '';
+                            let address = [street, housenumber, neighborhoodName || neighborhoodFromAPI].filter(Boolean).join(', ');
+                            if (!address) address = `${cityName} - SC`;
+                            
+                            return `
+                                <div class="flex items-start p-3 border-b border-slate-100 opacity-75">
+                                    <div class="ml-3 text-sm">
+                                        <strong class="block">${name}</strong>
+                                        <span class="text-slate-500">${address}</span>
+                                    </div>
+                                </div>`;
+                        }).join('');
+                    }
+
+                    resultsContainer.innerHTML = html;
+                    return newChurches.length > 0;
+                },
+                async importDataAuto(modalContent) {
+                    const checkboxes = modalContent.querySelectorAll('.import-checkbox:checked');
+                    if (checkboxes.length === 0) {
+                        UI.showToast('Nenhum local selecionado para importar.', true);
+                        return false;
+                    }
+
+                    const selectedChurches = Array.from(checkboxes).map(cb => JSON.parse(cb.dataset.church.replace(/&apos;/g, "'")));
+                    const batch = writeBatch(state.db);
+                    selectedChurches.forEach(church => {
+                        const newDocRef = doc(collection(state.db, state.igrejasCollectionRef.path));
+                        batch.set(newDocRef, church);
+                    });
+
+                    try {
+                        await batch.commit();
+                        UI.showToast(`${selectedChurches.length} locais importados com sucesso!`);
+                        return true;
+                    } catch(e) {
+                        UI.showToast(`Erro ao importar: ${e.message}`, true);
+                        return false;
+                    }
+                }
+            };
+            const API = {
+                async getBoundingBox(areaQuery, singlePoint = false) {
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(areaQuery)}&limit=1`;
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error(`Nominatim API respondeu com o estado ${response.status}`);
+                        const data = await response.json();
+
+                        if (data && data.length > 0) {
+                            const result = data[0];
+                            if(singlePoint) return { lat: parseFloat(result.lat), lon: parseFloat(result.lon) };
+
+                            const bbox = result.boundingbox.map(parseFloat);
+                            return { minLat: bbox[0], maxLat: bbox[1], minLon: bbox[2], maxLon: bbox[3] };
+                        }
+                        return null;
+                    } catch (error) { console.error('Bounding Box error:', error); return null; }
+                },
+                async reverseGeocode(lat, lon) {
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error(`API de geocodificação inversa falhou com o estado ${response.status}`);
+                        const data = await response.json();
+                        // The neighborhood can be in 'suburb', 'neighbourhood', or even 'quarter'
+                        return data.address.suburb || data.address.neighbourhood || data.address.quarter || null;
+                    } catch (error) {
+                        console.error('Reverse Geocode error:', error);
+                        return null;
+                    }
+                },
+                async getPlacesFromOverpass(query) {
+                    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error("Overpass API Error Response:", errorText);
+                            throw new Error(`Overpass API respondeu com o estado ${response.status}`);
+                        }
+                        const data = await response.json();
+                        return data.elements || [];
+                    } catch (error) { console.error('Overpass API error:', error); return []; }
+                },
+                haversineDistance(coords1, coords2) {
+                    const toRad = x => x * Math.PI / 180;
+                    const R = 6371; // Earth radius in km
+                    const dLat = toRad(coords2.lat - coords1.lat);
+                    const dLon = toRad(coords2.lon - coords1.lon);
+                    const lat1 = toRad(coords1.lat);
+                    const lat2 = toRad(coords2.lat);
+                    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    return R * c;
+                }
+            };
             
-            // --- INICIALIZAR A APLICAÇÃO ---
+            // --- INITIALIZE THE APPLICATION ---
             App.init();
         });
     </script>
