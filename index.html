@@ -639,10 +639,11 @@
                             </header>
                             
                             <div class="border-b border-slate-200">
-                                <nav class="flex -mb-px">
-                                    <button data-tab="manual" class="tab-btn active flex-1 p-3 text-sm font-semibold border-b-2">Manual</button>
-                                    <button data-tab="auto" class="tab-btn flex-1 p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Automático</button>
-                                    <button data-tab="smart" class="tab-btn flex-1 p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Busca Inteligente</button>
+                                <nav class="grid grid-cols-4">
+                                    <button data-tab="manual" class="tab-btn active p-3 text-sm font-semibold border-b-2">Manual</button>
+                                    <button data-tab="auto" class="tab-btn p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Automático</button>
+                                    <button data-tab="smart" class="tab-btn p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Inteligente</button>
+                                    <button data-tab="deep" class="tab-btn p-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700">Varredura</button>
                                 </nav>
                             </div>
 
@@ -678,6 +679,22 @@
                                      </select>
                                 </div>
                                 <button class="find-in-area-btn w-full mt-2 bg-sky-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-sky-700 transition">Buscar em <span class="search-area-name">Blumenau</span></button>
+                                <div class="results-container max-h-60 overflow-y-auto custom-scrollbar border rounded-md mt-4"></div>
+                            </div>
+                            
+                             <div id="import-deep-content" class="p-4 space-y-4 tab-content hidden">
+                                <p class="text-sm text-slate-600">Esta é a busca mais completa. Procura por cruzes, capelas e outros locais religiosos não convencionais. <strong class="text-amber-600">Esta busca pode demorar vários minutos.</strong></p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                     <select class="import-city-select col-span-2 md:col-span-1 bg-slate-100 rounded p-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                        <option value="Blumenau">Blumenau</option>
+                                        ${Object.keys(CIDADES_SC).filter(c=>c!=="Blumenau").sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+                                     </select>
+                                     <select class="import-neighborhood-select col-span-2 md:col-span-1 bg-slate-100 rounded p-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                        <option value="">Todos os Bairros</option>
+                                        ${BAIRROS_POR_CIDADE["Blumenau"].sort().map(n => `<option value="${n}">${n}</option>`).join('')}
+                                     </select>
+                                </div>
+                                <button class="find-in-area-btn w-full mt-2 bg-amber-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-amber-600 transition">Varredura em <span class="search-area-name">Blumenau</span></button>
                                 <div class="results-container max-h-60 overflow-y-auto custom-scrollbar border rounded-md mt-4"></div>
                             </div>
                             
@@ -757,7 +774,7 @@
                             if (activeTab === 'manual') {
                                 const data = modal.querySelector('#import-data-manual').value;
                                 success = await Admin.importDataManual(data);
-                            } else { // Handles both 'auto' and 'smart'
+                            } else { // Handles 'auto', 'smart', and 'deep'
                                 const activeContent = modal.querySelector(`#import-${activeTab}-content`);
                                 success = await Admin.importDataAuto(activeContent);
                             }
@@ -785,12 +802,14 @@
                                 button.disabled = true;
                                 button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
                                 
-                                const hasResults = await Admin.findChurchesInArea(parentContent, cityName, neighborhoodName, (activeTab === 'smart'));
+                                const searchMode = activeTab; // 'auto', 'smart', or 'deep'
+                                const hasResults = await Admin.findChurchesInArea(parentContent, cityName, neighborhoodName, searchMode);
                                 
                                 importBtn.disabled = !hasResults;
 
                                 button.disabled = false;
-                                button.innerHTML = `Buscar em <span class="search-area-name">${neighborhoodName ? `${neighborhoodName}, ${cityName}` : cityName}</span>`;
+                                const searchAreaName = neighborhoodName ? `${neighborhoodName}, ${cityName}` : cityName;
+                                button.innerHTML = `${activeTab === 'deep' ? 'Varredura' : 'Buscar'} em <span class="search-area-name">${searchAreaName}</span>`;
                             });
                         });
 
@@ -1033,7 +1052,7 @@
                     if (lowerName.includes('evang') || lowerName.includes('universal') || lowerName.includes('mundial') || lowerName.includes('quadrangular') || lowerName.includes('pentecostal')) return 'Outra Evangélica';
                     return 'Outra';
                 },
-                async findChurchesInArea(modalContent, cityName, neighborhoodName, isSmart) {
+                async findChurchesInArea(modalContent, cityName, neighborhoodName, searchMode) {
                     const resultsContainer = modalContent.querySelector('.results-container');
                     let areaQuery = `${cityName}, Santa Catarina, Brasil`;
                     let areaDisplayName = cityName;
@@ -1056,20 +1075,38 @@
                     resultsContainer.innerHTML = `<p class="p-4 text-center text-slate-500">A procurar locais de culto em ${areaDisplayName}... (Isto pode demorar um pouco)</p>`;
                     
                     const smartKeywords = "[Ii]greja|[Pp]aróquia|[Cc]apela|[Tt]emplo|[Ee]vangélica|[Cc]omunidade|[Mm]inistério|[Ss]alão do [Rr]eino|[Aa]dventista|[Mm]etodista|[Pp]resbiteriana|[Bb]atista|[Aa]ssembleia|[Uu]niversal|[Mm]undial|[Dd]eus é [Aa]mor|[Cc]ristã|[Cc]atedral|[Bb]asílica|[Ss]antuário";
-                    const query = isSmart
-                        ? `[out:json][timeout:120];(
-                            node["amenity"="place_of_worship"](${bboxString});
-                            way["amenity"="place_of_worship"](${bboxString});
-                            node["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
-                            way["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
-                            node["name"~"${smartKeywords}"](${bboxString});
-                            way["name"~"${smartKeywords}"](${bboxString});
-                          ); out center;`
-                        : `[out:json][timeout:30];(
-                            node["amenity"="place_of_worship"](${bboxString});
-                            way["amenity"="place_of_worship"](${bboxString});
-                          ); out center;`;
                     
+                    let query = '';
+                    switch (searchMode) {
+                        case 'auto':
+                            query = `[out:json][timeout:30];(node["amenity"="place_of_worship"](${bboxString});way["amenity"="place_of_worship"](${bboxString});); out center;`;
+                            break;
+                        case 'smart':
+                             query = `[out:json][timeout:120];(
+                                node["amenity"="place_of_worship"](${bboxString});
+                                way["amenity"="place_of_worship"](${bboxString});
+                                node["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
+                                way["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
+                                node["name"~"${smartKeywords}"](${bboxString});
+                                way["name"~"${smartKeywords}"](${bboxString});
+                              ); out center;`;
+                            break;
+                        case 'deep':
+                             query = `[out:json][timeout:180];(
+                                node["amenity"="place_of_worship"](${bboxString});
+                                way["amenity"="place_of_worship"](${bboxString});
+                                node["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
+                                way["building"~"[Cc]hurch|[Cc]hapel|[Rr]eligious"](${bboxString});
+                                node["name"~"${smartKeywords}"](${bboxString});
+                                way["name"~"${smartKeywords}"](${bboxString});
+                                node["historic"="wayside_cross"](${bboxString});
+                                way["historic"="wayside_cross"](${bboxString});
+                                node["man_made"="cross"](${bboxString});
+                                way["man_made"="cross"](${bboxString});
+                              ); out center;`;
+                            break;
+                    }
+
                     const results = await API.getPlacesFromOverpass(query);
 
                     if (results.length === 0) {
@@ -1078,7 +1115,10 @@
                     }
                     
                     const uniqueResults = new Map();
-                    results.forEach(item => { if (item.tags?.name) uniqueResults.set(item.id, item); });
+                    results.forEach(item => { if (item.tags?.name || item.tags?.historic === 'wayside_cross' || item.tags?.man_made === 'cross') {
+                        if(!item.tags.name) item.tags.name = "Cruz / Capela"; // Default name for unnamed crosses
+                        uniqueResults.set(item.id, item); 
+                    }});
 
                     const newChurches = [];
                     const alreadyInDbChurches = [];
