@@ -383,7 +383,8 @@
                         document.getElementById('modal-container').appendChild(modal);
                         
                         const close = () => modal.remove();
-                        modal.querySelector('.close-modal-btn')?.addEventListener('click', close);
+                        // Find ALL close buttons, including the main 'X' and footer buttons
+                        modal.querySelectorAll('.close-modal-btn').forEach(btn => btn.addEventListener('click', close));
                         modal.addEventListener('click', (e) => { if (e.target === modal) close(); }); // Close on backdrop click
                         return modal;
                     },
